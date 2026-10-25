@@ -191,3 +191,23 @@ Everything is tested on mbp-intel (2015 MacBook Pro, Iris 6100, Hyprland
 - The session lock is noticed by polling, within two seconds.
 - `pause=none` backgrounds are not frozen under the screensaver.
 
+
+## Measured on mbp-intel (2026-10-25)
+
+One output, eDP-1 2560x1600 at scale 2. 60 s each, after a warm-up, with
+45 s between runs. CPU per process is a share of one thread, "all CPUs" a
+share of the four. GPU busy comes from the i915 RC6 residency; temperature is
+`thermal_zone2` (x86_pkg_temp).
+
+| Screensaver | All CPUs | Program | Hyprland | GPU busy | Temp |
+| - | - | - | - | - | - |
+| none (idle desktop) | 0.3% | | 0.0% | ~0% | 49.8 °C |
+| `amiga` (FS-UAE, one demo) | 21.1% | fs-uae 62.5% | 8.8% | 66.2% | 71.9 °C |
+| `ttfx` (`omarchy-ttfx-layer`, rotate=10) | 3.4% | 4.5% | 4.5% | 22.2% | 59.5 °C |
+| stock (foot + ttfx) | 42.4% | foot 123.8% | 31.9% | 43.9% | 72.2 °C |
+
+The supervisor itself (`omarchy-bg-live`) stays at 0.1%. Dismissal took about
+200 ms for every kind of input with Amiga, and about 580 ms with ttfx
+(measured by the ttfx thread). FS-UAE emulating a full Amiga is the costly
+one: as a screensaver it costs about half of the stock one in CPU, but more
+GPU.
