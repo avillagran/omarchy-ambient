@@ -4,13 +4,20 @@ Live backgrounds and screensavers for [Omarchy](https://omarchy.org): programs
 that draw behind your windows instead of a still image or a video, or over
 everything once you step away.
 
-It comes with two:
+It comes with three:
 
-- **Terminal Effects**: the Omarchy screensaver's ttfx effects in a terminal, on
-  every monitor.
+- **Omarchy Effects**: the Omarchy screensaver's ttfx effects drawn on the GPU
+  by `omarchy-ttfx-layer`, which keeps its frame rate within what the
+  computer can afford. It comes with the Omarchy Audio Background plugin, or
+  set `binary=` in `~/.config/omarchy/bg-live/ttfx.conf`.
 - **Amiga Demos**: classic demoscene productions running in FS-UAE. The demos
   are downloaded the first time you choose them. As a screensaver it goes
   through all of them, muted.
+- **Terminal Effects**: the same effects in a kitty or ghostty terminal, for
+  computers without the GPU renderer.
+
+All three run as the background; Omarchy Effects and Amiga Demos also run as
+the screensaver.
 
 Anyone can add more: a terminal program, an emulator, a shader, a game. See
 [Creating a live background](docs/creating-sources.md).
