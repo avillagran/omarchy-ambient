@@ -1,0 +1,15 @@
+#!/bin/bash
+
+# One renderer per output. The output, its size, the layer, the keyboard mode
+# and the namespace reach it through the OMARCHY_BG_LIVE_* environment.
+
+args=(
+  --effects "${OMARCHY_BG_LIVE_SETTING_EFFECTS:-matrix,decrypt,rings,thunderstorm}"
+  --rotate "${OMARCHY_BG_LIVE_SETTING_ROTATE:-30}"
+  --fps "${OMARCHY_BG_LIVE_SETTING_FPS:-auto}"
+  --text "${OMARCHY_BG_LIVE_SETTING_TEXT:-OMARCHY}"
+  --resolution "${OMARCHY_BG_LIVE_SETTING_RESOLUTION:-2}"
+)
+[[ ${OMARCHY_BG_LIVE_SETTING_AUDIO:-0} == 1 ]] && args+=(--audio)
+
+exec "$OMARCHY_BG_LIVE_DATA/bin/omarchy-ttfx-layer" "${args[@]}"
