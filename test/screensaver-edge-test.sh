@@ -7,7 +7,7 @@
 
 source "$(dirname "$0")/lib.sh"
 
-export OMARCHY_BG_LIVE_PATH=$scratch/sources OMARCHY_BG_LIVE_DISMISS=$scratch/stubs/dismiss
+export OMARCHY_AMBIENT_PATH=$scratch/sources OMARCHY_AMBIENT_DISMISS=$scratch/stubs/dismiss
 events=$scratch/events
 mkfifo "$events" "$scratch/activity" "$scratch/die"
 
@@ -26,7 +26,7 @@ monitors "$one"
 workspaces '[{"id":1,"hasfullscreen":false},{"id":2,"hasfullscreen":false}]'
 
 make_source "$scratch/sources" demo $'name=Demo\nplacements=screensaver' "
-echo \"\$OMARCHY_BG_LIVE_OUTPUT \$1\" >>'$scratch/runs'
+echo \"\$OMARCHY_AMBIENT_OUTPUT \$1\" >>'$scratch/runs'
 exec sleep infinity"
 make_source "$scratch/sources" broken $'name=Broken\nplacements=screensaver' 'exit 3'
 make_source "$scratch/sources" unready $'name=Unready\nplacements=screensaver' 'exec sleep infinity'
@@ -34,12 +34,12 @@ printf '#!/bin/bash\necho "no network" >&2\nexit 1\n' >"$scratch/sources/unready
 chmod +x "$scratch/sources/unready/prepare"
 
 exec 9<>"$events"
-lock=$XDG_RUNTIME_DIR/omarchy-bg-live/screensaver
+lock=$XDG_RUNTIME_DIR/omarchy-ambient/screensaver
 logged() { grep -q "$1" "$scratch/log"; }
 gone() { ! kill -0 "$1" 2>/dev/null; }
-alive() { grep -lszx "OMARCHY_BG_LIVE_SOURCE=$1" /proc/[0-9]*/environ | grep -q .; }
+alive() { grep -lszx "OMARCHY_AMBIENT_SOURCE=$1" /proc/[0-9]*/environ | grep -q .; }
 cursor_back() { [[ $(tail -n 1 "$scratch/hyprctl.log") == *"invisible = false"* ]]; }
-start() { : >"$scratch/runs"; : >"$scratch/hyprctl.log"; "$BG_LIVE" screensaver "$@" >"$scratch/log" 2>&1 & saver=$!; }
+start() { : >"$scratch/runs"; : >"$scratch/hyprctl.log"; "$AMBIENT" screensaver "$@" >"$scratch/log" 2>&1 & saver=$!; }
 ended() { eventually gone "$saver"; }
 
 # Monitors
@@ -95,9 +95,9 @@ ended
 
 # Preparing
 
-"$BG_LIVE" screensaver --set demo
-"$BG_LIVE" screensaver --set unready >"$scratch/log" 2>&1
-assert "a source that can't be prepared is not selected" bash -c "[[ \$('$BG_LIVE' screensaver --get) == demo ]]"
+"$AMBIENT" screensaver --set demo
+"$AMBIENT" screensaver --set unready >"$scratch/log" 2>&1
+assert "a source that can't be prepared is not selected" bash -c "[[ \$('$AMBIENT' screensaver --get) == demo ]]"
 assert "the user is told why" logged "could not be prepared"
 start unready
 assert "nor run" ended
@@ -107,15 +107,15 @@ assert_eq "the lock is released" "$(cat "$lock")" ""
 # What check accepts
 
 make_source "$scratch/bad" odd $'name=Odd\nplacements=background wallpaper\ninput=keyboard' 'exit 0'
-assert_eq "check names bad placements and input" "$("$BG_LIVE" check "$scratch/bad/odd" 2>&1)" \
+assert_eq "check names bad placements and input" "$("$AMBIENT" check "$scratch/bad/odd" 2>&1)" \
   "odd: placements has wallpaper, not background or screensaver
 odd: input is keyboard, not dismiss or own"
-assert_eq "check accepts both placements" "$("$BG_LIVE" check "$scratch/sources/demo" 2>&1)" "demo: ok"
+assert_eq "check accepts both placements" "$("$AMBIENT" check "$scratch/sources/demo" 2>&1)" "demo: ok"
 
 # Usage
 
-assert "an unknown option fails" bash -c "! '$BG_LIVE' screensaver --bogus 2>/dev/null"
-assert "--set needs a source" bash -c "! '$BG_LIVE' screensaver --set 2>/dev/null"
-assert "an unknown source fails" bash -c "! '$BG_LIVE' screensaver nosuch 2>/dev/null"
+assert "an unknown option fails" bash -c "! '$AMBIENT' screensaver --bogus 2>/dev/null"
+assert "--set needs a source" bash -c "! '$AMBIENT' screensaver --set 2>/dev/null"
+assert "an unknown source fails" bash -c "! '$AMBIENT' screensaver nosuch 2>/dev/null"
 
 finish_tests

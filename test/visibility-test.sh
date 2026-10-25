@@ -5,8 +5,8 @@
 
 source "$(dirname "$0")/lib.sh"
 
-eval "$(sed -n '/^on_battery() {/,/^}/p; /^screensaver_running() {/,/^}/p; /^visible_outputs() {/,/^}/p' "$BG_LIVE")"
-POWER_SUPPLIES=$OMARCHY_BG_LIVE_POWER_SUPPLIES
+eval "$(sed -n '/^on_battery() {/,/^}/p; /^screensaver_running() {/,/^}/p; /^visible_outputs() {/,/^}/p' "$AMBIENT")"
+POWER_SUPPLIES=$OMARCHY_AMBIENT_POWER_SUPPLIES
 SCREENSAVER_LOCK=$XDG_RUNTIME_DIR/screensaver
 on_battery_mode=pause placement=background
 

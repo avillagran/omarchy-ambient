@@ -13,15 +13,15 @@ XML := $(LAYER_XML) $(DISMISS_XML)
 protocol_headers = $(patsubst %,$(BUILD)/%-client.h,$(basename $(notdir $(1))))
 protocol_glue = $(patsubst %,$(BUILD)/%.c,$(basename $(notdir $(1))))
 
-SOURCES := layer/omarchy-bg-live-layer.c $(wildcard $(VENDOR)/src/*.c) $(call protocol_glue,$(LAYER_XML))
-DISMISS_SOURCES := dismiss/omarchy-bg-live-dismiss.c $(call protocol_glue,$(DISMISS_XML))
+SOURCES := layer/omarchy-ambient-layer.c $(wildcard $(VENDOR)/src/*.c) $(call protocol_glue,$(LAYER_XML))
+DISMISS_SOURCES := dismiss/omarchy-ambient-dismiss.c $(call protocol_glue,$(DISMISS_XML))
 
 CFLAGS ?= -O2
 CFLAGS += -std=gnu11 -fPIC -Wall -I$(BUILD) -I$(VENDOR)/src $(shell pkg-config --cflags wayland-client)
 LDLIBS := $(shell pkg-config --libs wayland-client)
 
-LAYER := $(BUILD)/omarchy-bg-live-layer.so
-DISMISS := $(BUILD)/omarchy-bg-live-dismiss
+LAYER := $(BUILD)/omarchy-ambient-layer.so
+DISMISS := $(BUILD)/omarchy-ambient-dismiss
 
 all: $(LAYER) $(DISMISS)
 
@@ -41,14 +41,15 @@ $(DISMISS): $(DISMISS_SOURCES) $(call protocol_headers,$(DISMISS_XML))
 	$(CC) $(CFLAGS) -o $@ $(DISMISS_SOURCES) $(LDLIBS)
 
 install: $(LAYER) $(DISMISS)
-	install -Dm755 bin/omarchy-bg-live $(DESTDIR)$(PREFIX)/bin/omarchy-bg-live
-	install -Dm755 $(LAYER) $(DESTDIR)$(PREFIX)/lib/omarchy-bg-live/omarchy-bg-live-layer.so
-	install -Dm755 $(DISMISS) $(DESTDIR)$(PREFIX)/lib/omarchy-bg-live/omarchy-bg-live-dismiss
-	mkdir -p $(DESTDIR)$(PREFIX)/share/omarchy-bg-live
-	cp -r sources $(DESTDIR)$(PREFIX)/share/omarchy-bg-live/
+	install -Dm755 bin/omarchy-ambient $(DESTDIR)$(PREFIX)/bin/omarchy-ambient
+	install -Dm755 $(LAYER) $(DESTDIR)$(PREFIX)/lib/omarchy-ambient/omarchy-ambient-layer.so
+	install -Dm755 $(DISMISS) $(DESTDIR)$(PREFIX)/lib/omarchy-ambient/omarchy-ambient-dismiss
+	mkdir -p $(DESTDIR)$(PREFIX)/share/omarchy-ambient
+	cp -r sources $(DESTDIR)$(PREFIX)/share/omarchy-ambient/
+	rm -rf $(DESTDIR)$(PREFIX)/bin/omarchy-bg-live $(DESTDIR)$(PREFIX)/lib/omarchy-bg-live $(DESTDIR)$(PREFIX)/share/omarchy-bg-live
 
 uninstall:
-	rm -rf $(DESTDIR)$(PREFIX)/bin/omarchy-bg-live $(DESTDIR)$(PREFIX)/lib/omarchy-bg-live $(DESTDIR)$(PREFIX)/share/omarchy-bg-live
+	rm -rf $(DESTDIR)$(PREFIX)/bin/omarchy-ambient $(DESTDIR)$(PREFIX)/lib/omarchy-ambient $(DESTDIR)$(PREFIX)/share/omarchy-ambient
 
 test:
 	@for test in test/*-test.sh; do bash "$$test" || exit 1; done

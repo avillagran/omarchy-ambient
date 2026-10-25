@@ -6,11 +6,11 @@
 // It builds on gtk4-layer-shell's preload (vendor/gtk4-layer-shell) and adds
 // what a background needs that the stock preload lacks:
 //
-//   OMARCHY_BG_LIVE_OUTPUT     name of the output to cover (eDP-1, DP-2, ...);
+//   OMARCHY_AMBIENT_OUTPUT     name of the output to cover (eDP-1, DP-2, ...);
 //                              unset means the compositor's choice
-//   OMARCHY_BG_LIVE_NAMESPACE  layer namespace, omarchy-bg-live by default
-//   OMARCHY_BG_LIVE_LAYER      bottom (default), background, top or overlay
-//   OMARCHY_BG_LIVE_KEYBOARD   none (default), exclusive or on_demand
+//   OMARCHY_AMBIENT_NAMESPACE  layer namespace, omarchy-ambient by default
+//   OMARCHY_AMBIENT_LAYER      bottom (default), background, top or overlay
+//   OMARCHY_AMBIENT_KEYBOARD   none (default), exclusive or on_demand
 //
 // SDL 3 also exports every toplevel it creates through xdg-foreign, which a
 // layer surface cannot be, and the compositor then drops the connection. The
@@ -146,7 +146,7 @@ static struct wl_output* find_output(struct wl_display* display, const char* nam
     wl_event_queue_destroy(queue);
 
     if (!search.found) {
-        fprintf(stderr, "omarchy-bg-live-layer: no output named %s, using the compositor's choice\n", name);
+        fprintf(stderr, "omarchy-ambient-layer: no output named %s, using the compositor's choice\n", name);
         return NULL;
     }
     for (int i = 0; i < program_output_count; i++) {
@@ -154,7 +154,7 @@ static struct wl_output* find_output(struct wl_display* display, const char* nam
             return (struct wl_output*)program_outputs[i].proxy;
         }
     }
-    fprintf(stderr, "omarchy-bg-live-layer: the program never bound %s, using the compositor's choice\n", name);
+    fprintf(stderr, "omarchy-ambient-layer: the program never bound %s, using the compositor's choice\n", name);
     return NULL;
 }
 
@@ -184,7 +184,7 @@ static const char* env_or(const char* name, const char* fallback) {
 }
 
 static enum zwlr_layer_shell_v1_layer layer_from_env(void) {
-    const char* layer = env_or("OMARCHY_BG_LIVE_LAYER", "bottom");
+    const char* layer = env_or("OMARCHY_AMBIENT_LAYER", "bottom");
     if (strcmp(layer, "background") == 0) return ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND;
     if (strcmp(layer, "top") == 0) return ZWLR_LAYER_SHELL_V1_LAYER_TOP;
     if (strcmp(layer, "overlay") == 0) return ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY;
@@ -192,7 +192,7 @@ static enum zwlr_layer_shell_v1_layer layer_from_env(void) {
 }
 
 static enum zwlr_layer_surface_v1_keyboard_interactivity keyboard_from_env(void) {
-    const char* keyboard = env_or("OMARCHY_BG_LIVE_KEYBOARD", "none");
+    const char* keyboard = env_or("OMARCHY_AMBIENT_KEYBOARD", "none");
     if (strcmp(keyboard, "exclusive") == 0) return ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
     if (strcmp(keyboard, "on_demand") == 0) return ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND;
     return ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE;
@@ -214,13 +214,13 @@ static struct layer_surface_t* make_background(struct wl_surface* wl_surface) {
     struct layer_surface_t* self = malloc(sizeof(struct layer_surface_t));
     *self = layer_surface_make();
     self->get_preferred_size = no_preferred_size;
-    layer_surface_set_name_space(self, env_or("OMARCHY_BG_LIVE_NAMESPACE", "omarchy-bg-live"));
+    layer_surface_set_name_space(self, env_or("OMARCHY_AMBIENT_NAMESPACE", "omarchy-ambient"));
     layer_surface_set_layer(self, layer_from_env());
     layer_surface_set_anchor(self, (struct geom_edges_t){.left = true, .right = true, .top = true, .bottom = true});
     layer_surface_set_exclusive_zone(self, -1);
     layer_surface_set_keyboard_mode(self, keyboard_from_env());
 
-    const char* output = getenv("OMARCHY_BG_LIVE_OUTPUT");
+    const char* output = getenv("OMARCHY_AMBIENT_OUTPUT");
     if (output && *output) {
         layer_surface_set_output(self, find_output(libwayland_shim_proxy_get_display((struct wl_proxy*)wl_surface), output));
     }

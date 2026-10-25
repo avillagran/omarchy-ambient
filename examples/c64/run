@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # VICE's accurate C64 emulator, autostarting the program, silent and without
-# asking to confirm on exit. omarchy-bg-live layer turns its window into a
+# asking to confirm on exit. omarchy-ambient layer turns its window into a
 # layer on the output the supervisor names, on the layer and with the
 # keyboard its placement calls for.
-exec omarchy-bg-live layer x64sc -silent -sounddev dummy +confirmonexit \
-  -autostart "${1:-$OMARCHY_BG_LIVE_SETTING_PROGRAM}"
+exec omarchy-ambient layer x64sc -silent -sounddev dummy +confirmonexit \
+  -autostart "${1:-$OMARCHY_AMBIENT_SETTING_PROGRAM}"

@@ -1,17 +1,17 @@
 #!/bin/bash
 
 # Finds a build of the GPU layer renderer that has the standalone mode, and
-# links it as $OMARCHY_BG_LIVE_DATA/bin/omarchy-ttfx-layer. The program
+# links it as $OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer. The program
 # selects its standalone mode from that name.
 
-link=$OMARCHY_BG_LIVE_DATA/bin/omarchy-ttfx-layer
+link=$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer
 plugin=$HOME/.config/omarchy/plugins/io.github.avillagran.omarchy-audio-background/bin/ttfx-bg-rs-$(uname -m)
 
 capable() {
   [[ -x $1 ]] && [[ $(timeout 3 "$1" --standalone --probe 2>/dev/null) == "omarchy-ttfx-layer 1" ]]
 }
 
-for candidate in "$OMARCHY_BG_LIVE_SETTING_BINARY" "$(command -v omarchy-ttfx-layer)" "$plugin"; do
+for candidate in "$OMARCHY_AMBIENT_SETTING_BINARY" "$(command -v omarchy-ttfx-layer)" "$plugin"; do
   [[ -n $candidate ]] || continue
   candidate=$(readlink -f "$candidate")
   if capable "$candidate"; then
@@ -21,5 +21,5 @@ for candidate in "$OMARCHY_BG_LIVE_SETTING_BINARY" "$(command -v omarchy-ttfx-la
   fi
 done
 
-echo "Omarchy Effects needs omarchy-ttfx-layer: install the Omarchy Audio Background plugin, or set binary= in ~/.config/omarchy/bg-live/ttfx.conf" >&2
+echo "Omarchy Effects needs omarchy-ttfx-layer: install the Omarchy Audio Background plugin, or set binary= in ~/.config/omarchy/ambient/ttfx.conf" >&2
 exit 1

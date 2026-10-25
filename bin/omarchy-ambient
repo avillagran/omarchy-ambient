@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # omarchy:summary=Run a live program (screensaver, Amiga demo, game...) as the background or the screensaver
-# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | omarchy install|uninstall|status | check <source-dir> | layer <command...>
-# omarchy:examples=omarchy-bg-live start screensaver
+# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | install | remove | installed | check <source-dir> | layer <command...>
+# omarchy:examples=omarchy-ambient start screensaver
 
 # A live background is a program drawing behind the windows instead of a still
 # or a video. Each one comes from a source: a directory with a source.conf and
@@ -22,32 +22,32 @@ root=${self%/bin/*}
 # A checkout runs in place; an install keeps its parts under share/ and lib/.
 if [[ -d $root/sources ]]; then
   builtin_sources=$root/sources
-  layer_lib=$root/build/omarchy-bg-live-layer.so
-  dismiss_helper=$root/build/omarchy-bg-live-dismiss
+  layer_lib=$root/build/omarchy-ambient-layer.so
+  dismiss_helper=$root/build/omarchy-ambient-dismiss
 else
-  builtin_sources=$root/share/omarchy-bg-live/sources
-  layer_lib=$root/lib/omarchy-bg-live/omarchy-bg-live-layer.so
-  dismiss_helper=$root/lib/omarchy-bg-live/omarchy-bg-live-dismiss
+  builtin_sources=$root/share/omarchy-ambient/sources
+  layer_lib=$root/lib/omarchy-ambient/omarchy-ambient-layer.so
+  dismiss_helper=$root/lib/omarchy-ambient/omarchy-ambient-dismiss
 fi
-dismiss_helper=${OMARCHY_BG_LIVE_DISMISS:-$dismiss_helper}
+dismiss_helper=${OMARCHY_AMBIENT_DISMISS:-$dismiss_helper}
 
-CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/bg-live
-SOURCE_PATH=${OMARCHY_BG_LIVE_PATH:-$CONFIG_DIR/sources:$builtin_sources}
-DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-bg-live
+CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/ambient
+SOURCE_PATH=${OMARCHY_AMBIENT_PATH:-$CONFIG_DIR/sources:$builtin_sources}
+DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-ambient
 STATE_DIR=$HOME/.local/state/omarchy
-LIVE_FILE=$STATE_DIR/bg-live
-POWER_SUPPLIES=${OMARCHY_BG_LIVE_POWER_SUPPLIES:-/sys/class/power_supply}
-UNIT=omarchy-bg-live
-RUN_DIR=${XDG_RUNTIME_DIR:-/run/user/$UID}/omarchy-bg-live
+LIVE_FILE=$STATE_DIR/ambient
+POWER_SUPPLIES=${OMARCHY_AMBIENT_POWER_SUPPLIES:-/sys/class/power_supply}
+UNIT=omarchy-ambient
+RUN_DIR=${XDG_RUNTIME_DIR:-/run/user/$UID}/omarchy-ambient
 # Held with flock by the running screensaver, and holding its pid, so a live
 # background can tell it is covered.
 SCREENSAVER_LOCK=$RUN_DIR/screensaver
 SCREENSAVER_CONF=$CONFIG_DIR/screensaver.conf
 # The first activity this soon after the screensaver starts doesn't end it.
-GRACE_MS=${OMARCHY_BG_LIVE_GRACE_MS:-1000}
+GRACE_MS=${OMARCHY_AMBIENT_GRACE_MS:-1000}
 
 # Keys the supervisor reads itself; every other key in source.conf reaches the
-# source as OMARCHY_BG_LIVE_SETTING_<KEY>.
+# source as OMARCHY_AMBIENT_SETTING_<KEY>.
 RESERVED_KEYS=" name icon description order outputs pause on_battery needs packages placements input "
 
 # Where the source runs: background (behind the windows) or screensaver.
@@ -55,7 +55,7 @@ placement=background
 
 fail() {
   echo "$*" >&2
-  notify-send -a omarchy-bg-live "Live background" "$*" 2>/dev/null
+  notify-send -a omarchy-ambient "Live background" "$*" 2>/dev/null
   exit 1
 }
 
@@ -81,7 +81,7 @@ source_ids() {
 }
 
 # key=value lines from the source's source.conf, then the user's
-# ~/.config/omarchy/bg-live/<source>.conf, so a later line overrides.
+# ~/.config/omarchy/ambient/<source>.conf, so a later line overrides.
 settings_lines() {
   cat "$2/source.conf" "$CONFIG_DIR/$1.conf" 2>/dev/null |
     sed -n 's/^[[:space:]]*\([a-z][a-z0-9_]*\)[[:space:]]*=[[:space:]]*\(.*\)$/\1=\2/p' |
@@ -113,21 +113,21 @@ supports() {
 # What prepare, pick and run see of their source.
 export_source_env() {
   local key value
-  export OMARCHY_BG_LIVE_SOURCE=$1 OMARCHY_BG_LIVE_SOURCE_DIR=$2
-  export OMARCHY_BG_LIVE_PLACEMENT=$placement
+  export OMARCHY_AMBIENT_SOURCE=$1 OMARCHY_AMBIENT_SOURCE_DIR=$2
+  export OMARCHY_AMBIENT_PLACEMENT=$placement
   if [[ $placement == screensaver ]]; then
-    export OMARCHY_BG_LIVE_LAYER=overlay OMARCHY_BG_LIVE_KEYBOARD=exclusive
+    export OMARCHY_AMBIENT_LAYER=overlay OMARCHY_AMBIENT_KEYBOARD=exclusive
   else
-    export OMARCHY_BG_LIVE_LAYER=bottom OMARCHY_BG_LIVE_KEYBOARD=none
+    export OMARCHY_AMBIENT_LAYER=bottom OMARCHY_AMBIENT_KEYBOARD=none
   fi
-  export OMARCHY_BG_LIVE_DATA=$DATA_DIR/$1
-  export OMARCHY_BG_LIVE_NAMESPACE=omarchy-bg-live-$1
-  export OMARCHY_BG_LIVE_LAYER_LIB=$layer_lib
+  export OMARCHY_AMBIENT_DATA=$DATA_DIR/$1
+  export OMARCHY_AMBIENT_NAMESPACE=omarchy-ambient-$1
+  export OMARCHY_AMBIENT_LAYER_LIB=$layer_lib
   export PATH="${self%/*}:$PATH"
-  mkdir -p "$OMARCHY_BG_LIVE_DATA"
+  mkdir -p "$OMARCHY_AMBIENT_DATA"
 
   while IFS='=' read -r key value; do
-    [[ $RESERVED_KEYS == *" $key "* ]] || export "OMARCHY_BG_LIVE_SETTING_${key^^}=$value"
+    [[ $RESERVED_KEYS == *" $key "* ]] || export "OMARCHY_AMBIENT_SETTING_${key^^}=$value"
   done < <(settings_lines "$1" "$2")
 }
 
@@ -163,7 +163,7 @@ prepare_and_pick() {
   local id=$1 choice=$2 dir
 
   prepare_source "$id" start "$id" "$choice" || return 1
-  dir=$OMARCHY_BG_LIVE_SOURCE_DIR
+  dir=$OMARCHY_AMBIENT_SOURCE_DIR
   if [[ -z $choice && -x $dir/pick ]]; then
     choice=$("$dir/pick") && [[ -n $choice ]] || return 1
   fi
@@ -258,8 +258,8 @@ launch() {
   work=$runtime/${output/\*/all}
   mkdir -p "$work"
 
-  OMARCHY_BG_LIVE_OUTPUT=${output#\*} OMARCHY_BG_LIVE_WIDTH=$width OMARCHY_BG_LIVE_HEIGHT=$height \
-    OMARCHY_BG_LIVE_SCALE=$scale OMARCHY_BG_LIVE_RUNTIME=$work OMARCHY_BG_LIVE_CHOICE=$choice \
+  OMARCHY_AMBIENT_OUTPUT=${output#\*} OMARCHY_AMBIENT_WIDTH=$width OMARCHY_AMBIENT_HEIGHT=$height \
+    OMARCHY_AMBIENT_SCALE=$scale OMARCHY_AMBIENT_RUNTIME=$work OMARCHY_AMBIENT_CHOICE=$choice \
     setsid "$dir/run" ${choice:+"$choice"} </dev/null 8>&- &
 
   program[$output]=$!
@@ -395,7 +395,7 @@ supervise() {
   on_battery_mode=$(setting "$id" "$dir" on_battery pause)
   input=$(setting "$id" "$dir" input dismiss)
   export_source_env "$id" "$dir"
-  runtime=$(mktemp -d -t omarchy-bg-live.XXXXXX)
+  runtime=$(mktemp -d -t omarchy-ambient.XXXXXX)
   mkdir -p "$RUN_DIR"
 
   # Leave OWE alone if the user paused it; it is theirs to resume. Under a
@@ -553,17 +553,22 @@ check() {
 }
 
 # Omarchy integration for releases that don't offer live backgrounds and
-# screensavers themselves yet. `omarchy install` adds the menu rows to the
-# user's menu extension, between markers, and routes the idle screensaver
-# through omarchy-bg-live with a clone of Omarchy's idle service. Both are
-# skipped when Omarchy does it natively, and `omarchy uninstall` undoes them.
+# screensavers themselves yet. `install` adds the menu rows to the user's menu
+# extension, between markers, and routes the idle screensaver through
+# omarchy-ambient with a clone of Omarchy's idle service. Both are skipped
+# when Omarchy does it natively, and `remove` undoes them.
 OMARCHY_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy
 MENU_EXTENSION=$OMARCHY_DIR/extensions/omarchy-menu.jsonc
-IDLE_ID=omarchy-bg-live.idle
+IDLE_ID=omarchy-ambient.idle
 IDLE_PLUGIN=$OMARCHY_DIR/plugins/$IDLE_ID
 LAUNCHER=$DATA_DIR/omarchy/omarchy-launch-screensaver
-MENU_BEGIN="// >>> omarchy-bg-live: added by \"omarchy-bg-live omarchy install\", removed by \"omarchy-bg-live omarchy uninstall\""
-MENU_END="// <<< omarchy-bg-live"
+MENU_BEGIN="// >>> omarchy-ambient: added by \"omarchy-ambient install\", removed by \"omarchy-ambient remove\""
+MENU_END="// <<< omarchy-ambient"
+
+# omarchy-ambient was called omarchy-bg-live at first.
+LEGACY_CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/bg-live
+LEGACY_DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-bg-live
+LEGACY_IDLE_PLUGIN=$OMARCHY_DIR/plugins/omarchy-bg-live.idle
 
 omarchy_menu() {
   echo "${OMARCHY_PATH:-/usr/share/omarchy}/default/omarchy/omarchy-menu.jsonc"
@@ -579,7 +584,7 @@ native_menu() {
 }
 
 native_launcher() {
-  grep -q 'omarchy-bg-live' "${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-launch-screensaver" 2>/dev/null
+  grep -q 'omarchy-ambient' "${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-launch-screensaver" 2>/dev/null
 }
 
 # One "id": {row} line per menu row, built with jq so every string is
@@ -622,14 +627,15 @@ menu_rows() {
   fi
 }
 
-# Drops the marked block from the menu extension, keeping everything else.
+# Drops the marked blocks from the menu extension, ours and the ones
+# omarchy-bg-live added, keeping everything else.
 remove_menu_rows() {
   [[ -f $MENU_EXTENSION ]] || return 0
   local temp
   temp=$(mktemp "$MENU_EXTENSION.XXXXXX")
-  BEGIN_MARK=$MENU_BEGIN END_MARK=$MENU_END awk '
-    $0 == ENVIRON["BEGIN_MARK"] { skip = 1; next }
-    $0 == ENVIRON["END_MARK"] { skip = 0; next }
+  awk '
+    /^\/\/ >>> omarchy-(ambient|bg-live)(:|$)/ { skip = 1; next }
+    /^\/\/ <<< omarchy-(ambient|bg-live)$/ { skip = 0; next }
     !skip' "$MENU_EXTENSION" >"$temp"
   mv -f "$temp" "$MENU_EXTENSION"
 }
@@ -656,7 +662,7 @@ install_launcher() {
   mkdir -p "${LAUNCHER%/*}"
   cat >"$LAUNCHER" <<EOF
 #!/bin/bash
-# Installed by "omarchy-bg-live omarchy install"; "omarchy-bg-live omarchy uninstall" removes it.
+# Installed by "omarchy-ambient install"; "omarchy-ambient remove" removes it.
 # Runs the live screensaver when one is chosen, and Omarchy's own otherwise.
 if omarchy-toggle-enabled screensaver-off && [[ \$1 != force ]]; then
   exit 1
@@ -681,11 +687,11 @@ install_idle() {
   other=$(other_idle_clone)
   [[ -z $other ]] || { echo "The idle service is already replaced by $other; leaving it alone" >&2; return 1; }
   grep -q '|| omarchy-launch-screensaver")' "$source/Service.qml" 2>/dev/null ||
-    { echo "This Omarchy's idle service is not one omarchy-bg-live knows how to route" >&2; return 1; }
+    { echo "This Omarchy's idle service is not one omarchy-ambient knows how to route" >&2; return 1; }
 
   rm -rf "$IDLE_PLUGIN"
   mkdir -p "${IDLE_PLUGIN%/*}"
-  stage=$(mktemp -d "${IDLE_PLUGIN%/*}/.omarchy-bg-live.XXXXXX")
+  stage=$(mktemp -d "${IDLE_PLUGIN%/*}/.omarchy-ambient.XXXXXX")
   cp -aL "$source/." "$stage/"
   sed -i "s#|| omarchy-launch-screensaver\")#|| \\\\\"$LAUNCHER\\\\\"\")#" "$stage/Service.qml"
   jq --arg id "$IDLE_ID" '.id = $id | .name = "Idle (live screensavers)" |
@@ -703,15 +709,24 @@ install_idle() {
 }
 
 uninstall_idle() {
-  [[ -d $IDLE_PLUGIN ]] || return 0
-  omarchy plugin disable "$IDLE_ID" >/dev/null 2>&1
-  rm -rf "$IDLE_PLUGIN"
+  local plugin=${1:-$IDLE_PLUGIN}
+  [[ -d $plugin ]] || return 0
+  omarchy plugin disable "${plugin##*/}" >/dev/null 2>&1
+  rm -rf "$plugin"
   omarchy-shell -q shell rescanPlugins
   omarchy plugin enable omarchy.idle >/dev/null 2>&1
 }
 
+# What omarchy-bg-live left running or wired up runs a program that is gone.
+remove_legacy() {
+  uninstall_idle "$LEGACY_IDLE_PLUGIN"
+  systemctl --user stop omarchy-bg-live 2>/dev/null
+  rm -f "$STATE_DIR/bg-live"
+}
+
 omarchy_install() {
   local rows
+  remove_legacy
   remove_menu_rows
   if native_menu; then
     echo "menu: this Omarchy lists live backgrounds and screensavers itself"
@@ -721,7 +736,7 @@ omarchy_install() {
 
   if native_launcher; then
     uninstall_idle
-    echo "screensaver: this Omarchy hands over to omarchy-bg-live itself"
+    echo "screensaver: this Omarchy hands over to omarchy-ambient itself"
   else
     install_launcher
     if [[ -d $IDLE_PLUGIN ]] || install_idle; then
@@ -731,6 +746,7 @@ omarchy_install() {
 }
 
 omarchy_uninstall() {
+  remove_legacy
   remove_menu_rows
   uninstall_idle
   rm -f "$LAUNCHER"
@@ -747,22 +763,32 @@ omarchy_status() {
   echo "menu=$menu idle=$idle"
 }
 
-usage="Usage: omarchy-bg-live list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | omarchy install|uninstall|status | check <source-dir> | layer <command...>"
+# The settings and downloads of omarchy-bg-live move over once. Its launcher
+# for the idle service goes with them, and install writes a new one.
+if [[ -d $LEGACY_CONFIG_DIR && ! -e $CONFIG_DIR ]]; then
+  mv "$LEGACY_CONFIG_DIR" "$CONFIG_DIR"
+fi
+if [[ -d $LEGACY_DATA_DIR && ! -e $DATA_DIR ]]; then
+  mv "$LEGACY_DATA_DIR" "$DATA_DIR"
+  rm -f "$LAUNCHER"
+fi
+
+usage="Usage: omarchy-ambient list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | install | remove | installed | check <source-dir> | layer <command...>"
 
 case $1 in
   list)
     list "$2"
     ;;
   start)
-    [[ -n $2 ]] || { echo "Usage: omarchy-bg-live start <source> [choice]" >&2; exit 1; }
+    [[ -n $2 ]] || { echo "Usage: omarchy-ambient start <source> [choice]" >&2; exit 1; }
     choice=$(prepare_and_pick "$2" "$3") || exit 0
     systemctl --user stop "$UNIT" 2>/dev/null
     systemd-run --user --quiet --collect --unit="$UNIT" -p KillMode=mixed -p TimeoutStopSec=10 \
-      -E PATH="$PATH" -E WAYLAND_DISPLAY -E HYPRLAND_INSTANCE_SIGNATURE -E OMARCHY_PATH -E OMARCHY_BG_LIVE_PATH \
+      -E PATH="$PATH" -E WAYLAND_DISPLAY -E HYPRLAND_INSTANCE_SIGNATURE -E OMARCHY_PATH -E OMARCHY_AMBIENT_PATH \
       "$self" supervise "$2" "$choice"
     ;;
   run)
-    [[ -n $2 ]] || { echo "Usage: omarchy-bg-live run <source> [choice]" >&2; exit 1; }
+    [[ -n $2 ]] || { echo "Usage: omarchy-ambient run <source> [choice]" >&2; exit 1; }
     choice=$(prepare_and_pick "$2" "$3") || exit 0
     systemctl --user stop "$UNIT" 2>/dev/null
     supervise "$2" "$choice"
@@ -781,23 +807,33 @@ case $1 in
     case $2 in
       --get) screensaver_selected ;;
       --set)
-        [[ -n $3 ]] || { echo "Usage: omarchy-bg-live screensaver --set <source|text>" >&2; exit 1; }
+        [[ -n $3 ]] || { echo "Usage: omarchy-ambient screensaver --set <source|text>" >&2; exit 1; }
         select_screensaver "$3"
         ;;
       -*) echo "$usage" >&2; exit 1 ;;
       *) run_screensaver "$2" "$3" ;;
     esac
     ;;
+  install)
+    omarchy_install
+    ;;
+  remove)
+    omarchy_uninstall
+    ;;
+  installed)
+    omarchy_status
+    ;;
+  # The names omarchy-bg-live had for them.
   omarchy)
     case $2 in
       install) omarchy_install ;;
       uninstall) omarchy_uninstall ;;
       status) omarchy_status ;;
-      *) echo "Usage: omarchy-bg-live omarchy install|uninstall|status" >&2; exit 1 ;;
+      *) echo "$usage" >&2; exit 1 ;;
     esac
     ;;
   check)
-    [[ -n $2 ]] || { echo "Usage: omarchy-bg-live check <source-dir>" >&2; exit 1; }
+    [[ -n $2 ]] || { echo "Usage: omarchy-ambient check <source-dir>" >&2; exit 1; }
     check "$2"
     ;;
   layer)

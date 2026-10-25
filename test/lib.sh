@@ -1,14 +1,14 @@
 # Shared by the tests: a scratch home, stub commands, and assertions.
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-BG_LIVE=$ROOT/bin/omarchy-bg-live
+AMBIENT=$ROOT/bin/omarchy-ambient
 failures=0
 
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 
 export HOME=$scratch/home XDG_CONFIG_HOME=$scratch/home/.config XDG_DATA_HOME=$scratch/home/.local/share
-export OMARCHY_BG_LIVE_POWER_SUPPLIES=$scratch/power XDG_RUNTIME_DIR=$scratch/run
+export OMARCHY_AMBIENT_POWER_SUPPLIES=$scratch/power XDG_RUNTIME_DIR=$scratch/run
 mkdir -p "$HOME/.local/state/omarchy/current" "$scratch/stubs" "$scratch/power/AC" "$XDG_RUNTIME_DIR"
 echo Mains >"$scratch/power/AC/type"
 echo 1 >"$scratch/power/AC/online"

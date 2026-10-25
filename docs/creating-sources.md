@@ -2,12 +2,12 @@
 
 A live background is any program that draws behind your windows: a terminal
 effect, an emulator running a demo, a shader, a game in attract mode, a
-dashboard. `omarchy-bg-live` runs it, gives it an output to cover, and freezes
+dashboard. `omarchy-ambient` runs it, gives it an output to cover, and freezes
 it whenever nobody can see it.
 
 Each live background comes from a **source**: a directory with a
 `source.conf` and an executable called `run`. Put your own in
-`~/.config/omarchy/bg-live/sources/<id>/` and it shows up in
+`~/.config/omarchy/ambient/sources/<id>/` and it shows up in
 **Style › Background**, next to the bundled ones. A source can also be a
 screensaver; see [Screensavers](#screensavers).
 
@@ -16,8 +16,8 @@ screensaver; see [Screensavers](#screensavers).
 Matrix rain from `cmatrix`, behind your windows:
 
 ```sh
-mkdir -p ~/.config/omarchy/bg-live/sources/matrix
-cd ~/.config/omarchy/bg-live/sources/matrix
+mkdir -p ~/.config/omarchy/ambient/sources/matrix
+cd ~/.config/omarchy/ambient/sources/matrix
 
 cat > source.conf <<'EOF'
 name=Matrix
@@ -30,15 +30,15 @@ EOF
 cat > run <<'EOF'
 #!/bin/bash
 exec kitty +kitten panel --edge=center --layer=bottom --focus-policy=not-allowed \
-  --output-name="$OMARCHY_BG_LIVE_OUTPUT" cmatrix -b
+  --output-name="$OMARCHY_AMBIENT_OUTPUT" cmatrix -b
 EOF
 chmod +x run
 
-omarchy-bg-live check .
-omarchy-bg-live start matrix
+omarchy-ambient check .
+omarchy-ambient start matrix
 ```
 
-`omarchy-bg-live stop`, choosing a theme, or setting an ordinary background
+`omarchy-ambient stop`, choosing a theme, or setting an ordinary background
 ends it.
 
 ## The directory
@@ -51,7 +51,7 @@ ends it.
 | `pick` | no | Lets the user choose what to show (a demo, a level, a color). Prints the choice on stdout; printing nothing cancels |
 
 The directory name is the source's id: lowercase letters, digits and dashes.
-A source in `~/.config/omarchy/bg-live/sources` replaces a bundled source with
+A source in `~/.config/omarchy/ambient/sources` replaces a bundled source with
 the same id.
 
 ## source.conf
@@ -73,35 +73,35 @@ Plain `key=value` lines; `#` starts a comment.
 | `packages` | | Packages that provide them. When a need is missing, starting the source offers to install these |
 
 Every other key is a setting of your own. It reaches `prepare`, `pick` and
-`run` as `OMARCHY_BG_LIVE_SETTING_<KEY>`, so `speed=3` arrives as
-`OMARCHY_BG_LIVE_SETTING_SPEED=3`. Users change any key, yours included, in
-`~/.config/omarchy/bg-live/<id>.conf` without touching the source:
+`run` as `OMARCHY_AMBIENT_SETTING_<KEY>`, so `speed=3` arrives as
+`OMARCHY_AMBIENT_SETTING_SPEED=3`. Users change any key, yours included, in
+`~/.config/omarchy/ambient/<id>.conf` without touching the source:
 
 ```sh
-# ~/.config/omarchy/bg-live/amiga.conf
+# ~/.config/omarchy/ambient/amiga.conf
 outputs=focused
 ```
 
 ## What `run` gets
 
 `run` receives the user's choice (from `pick`, or from
-`omarchy-bg-live start <id> <choice>`) as its first argument, and this
+`omarchy-ambient start <id> <choice>`) as its first argument, and this
 environment:
 
 | Variable | Value |
 | - | - |
-| `OMARCHY_BG_LIVE_OUTPUT` | The monitor to cover, such as `eDP-1`. Empty when `outputs=all` |
-| `OMARCHY_BG_LIVE_WIDTH`, `OMARCHY_BG_LIVE_HEIGHT` | That monitor's size in pixels |
-| `OMARCHY_BG_LIVE_SCALE` | Its scale factor |
-| `OMARCHY_BG_LIVE_CHOICE` | The choice again |
-| `OMARCHY_BG_LIVE_SOURCE`, `OMARCHY_BG_LIVE_SOURCE_DIR` | The id and the source's directory |
-| `OMARCHY_BG_LIVE_DATA` | A directory that persists: `~/.local/share/omarchy-bg-live/<id>`. Downloads go here |
-| `OMARCHY_BG_LIVE_RUNTIME` | A directory for this run only, removed when it ends |
-| `OMARCHY_BG_LIVE_NAMESPACE` | A layer namespace to use: `omarchy-bg-live-<id>` |
-| `OMARCHY_BG_LIVE_PLACEMENT` | `background` or `screensaver` |
-| `OMARCHY_BG_LIVE_LAYER` | The layer to draw on: `bottom`, or `overlay` as a screensaver |
-| `OMARCHY_BG_LIVE_KEYBOARD` | `none`, or `exclusive` as a screensaver |
-| `OMARCHY_BG_LIVE_SETTING_*` | Your settings |
+| `OMARCHY_AMBIENT_OUTPUT` | The monitor to cover, such as `eDP-1`. Empty when `outputs=all` |
+| `OMARCHY_AMBIENT_WIDTH`, `OMARCHY_AMBIENT_HEIGHT` | That monitor's size in pixels |
+| `OMARCHY_AMBIENT_SCALE` | Its scale factor |
+| `OMARCHY_AMBIENT_CHOICE` | The choice again |
+| `OMARCHY_AMBIENT_SOURCE`, `OMARCHY_AMBIENT_SOURCE_DIR` | The id and the source's directory |
+| `OMARCHY_AMBIENT_DATA` | A directory that persists: `~/.local/share/omarchy-ambient/<id>`. Downloads go here |
+| `OMARCHY_AMBIENT_RUNTIME` | A directory for this run only, removed when it ends |
+| `OMARCHY_AMBIENT_NAMESPACE` | A layer namespace to use: `omarchy-ambient-<id>` |
+| `OMARCHY_AMBIENT_PLACEMENT` | `background` or `screensaver` |
+| `OMARCHY_AMBIENT_LAYER` | The layer to draw on: `bottom`, or `overlay` as a screensaver |
+| `OMARCHY_AMBIENT_KEYBOARD` | `none`, or `exclusive` as a screensaver |
+| `OMARCHY_AMBIENT_SETTING_*` | Your settings |
 
 `prepare` and `pick` get the same variables, except the output and runtime
 ones.
@@ -131,17 +131,17 @@ background:
 
 ```sh
 exec kitty +kitten panel --edge=center --layer=bottom --focus-policy=not-allowed \
-  --output-name="$OMARCHY_BG_LIVE_OUTPUT" your-program
+  --output-name="$OMARCHY_AMBIENT_OUTPUT" your-program
 ```
 
-**Anything else goes through `omarchy-bg-live layer`.** It preloads a small
+**Anything else goes through `omarchy-ambient layer`.** It preloads a small
 library that turns the program's first window into a full-screen layer
-surface on `OMARCHY_BG_LIVE_OUTPUT`, on the bottom layer, without keyboard
+surface on `OMARCHY_AMBIENT_OUTPUT`, on the bottom layer, without keyboard
 focus:
 
 ```sh
-exec omarchy-bg-live layer mpv --no-audio "av://lavfi:mandelbrot"
-SDL_VIDEODRIVER=wayland exec omarchy-bg-live layer fs-uae demo.fs-uae
+exec omarchy-ambient layer mpv --no-audio "av://lavfi:mandelbrot"
+SDL_VIDEODRIVER=wayland exec omarchy-ambient layer fs-uae demo.fs-uae
 ```
 
 The library builds on
@@ -158,21 +158,21 @@ doesn't. Some programs still won't cooperate. This is what has been tried:
 
 **A program written for this** can create its own layer surface with
 gtk4-layer-shell, or any wlr-layer-shell binding, using
-`OMARCHY_BG_LIVE_OUTPUT` and the `bottom` layer.
+`OMARCHY_AMBIENT_OUTPUT` and the `bottom` layer.
 
 ## Screensavers
 
 Add `screensaver` to `placements` and the source shows up in
 **Style › Screensaver** too. When the idle timeout comes,
-`omarchy-bg-live screensaver` runs it over everything on every monitor (with
+`omarchy-ambient screensaver` runs it over everything on every monitor (with
 `outputs=each`), with the keyboard to itself and the cursor hidden. The first
 mouse motion, click, scroll or key ends it, and so does the session locking.
 A live background is frozen meanwhile.
 
-`run` is the same program; it reads `OMARCHY_BG_LIVE_PLACEMENT` to tell. It
+`run` is the same program; it reads `OMARCHY_AMBIENT_PLACEMENT` to tell. It
 must cover the whole output with an opaque surface, on
-`OMARCHY_BG_LIVE_LAYER` and with `OMARCHY_BG_LIVE_KEYBOARD`.
-`omarchy-bg-live layer` does that already. A program that makes its own
+`OMARCHY_AMBIENT_LAYER` and with `OMARCHY_AMBIENT_KEYBOARD`.
+`omarchy-ambient layer` does that already. A program that makes its own
 layer surface follows them itself, and should not bind text input
 (`zwp_text_input_v3`): Hyprland takes the input method's reply to it for user
 activity, which ends the screensaver.
@@ -183,19 +183,19 @@ showing the desktop in between, start the next program before ending the
 last one, as [`sources/amiga/run`](../sources/amiga/run) does.
 
 ```sh
-omarchy-bg-live screensaver --set matrix   # choose it (installs and prepares it)
-omarchy-bg-live screensaver matrix         # preview it now
-omarchy-bg-live screensaver --set text     # back to Omarchy's own
+omarchy-ambient screensaver --set matrix   # choose it (installs and prepares it)
+omarchy-ambient screensaver matrix         # preview it now
+omarchy-ambient screensaver --set text     # back to Omarchy's own
 ```
 
 ## Trying it out
 
 ```sh
-omarchy-bg-live check ~/.config/omarchy/bg-live/sources/matrix
-omarchy-bg-live run matrix        # in the foreground; Ctrl+C ends it
-omarchy-bg-live start matrix      # in the background, like the menu does
-omarchy-bg-live status
-journalctl --user -u omarchy-bg-live -f
+omarchy-ambient check ~/.config/omarchy/ambient/sources/matrix
+omarchy-ambient run matrix        # in the foreground; Ctrl+C ends it
+omarchy-ambient start matrix      # in the background, like the menu does
+omarchy-ambient status
+journalctl --user -u omarchy-ambient -f
 ```
 
 The log shows each program starting, pausing, resuming, restarting and
@@ -207,7 +207,7 @@ ending, per output.
   ttfx effects, through kitty's panel or ghostty.
 - [`sources/amiga`](../sources/amiga): `prepare` downloads and verifies a demo
   pack, `pick` shows previews, and `run` plays the demo in FS-UAE through
-  `omarchy-bg-live layer`.
+  `omarchy-ambient layer`.
 - [`examples/system-monitor`](../examples/system-monitor): a terminal program
   (btop) as the background.
 - [`examples/mandelbrot`](../examples/mandelbrot): a graphical program (mpv)
@@ -216,4 +216,4 @@ ending, per output.
   VICE, as the background or the screensaver. Untested sketch: the VICE
   package isn't on the test machines yet.
 
-Copy any of them into `~/.config/omarchy/bg-live/sources/` to start your own.
+Copy any of them into `~/.config/omarchy/ambient/sources/` to start your own.

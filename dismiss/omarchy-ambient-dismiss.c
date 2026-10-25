@@ -7,7 +7,7 @@
 // activity ends it. So the input that crossed the idle threshold, or the click
 // on "Preview", never dismisses the screensaver at once.
 //
-//   omarchy-bg-live-dismiss [--grace <ms>]
+//   omarchy-ambient-dismiss [--grace <ms>]
 //
 // Prints "ready" once it is listening and "activity" when the user is back,
 // then exits 0. Exits 1 when the compositor lacks the protocol or the
@@ -70,7 +70,7 @@ int main(int argc, char** argv) {
         if (strcmp(argv[i], "--grace") == 0 && i + 1 < argc) {
             grace = strtol(argv[++i], NULL, 10);
         } else {
-            fprintf(stderr, "Usage: omarchy-bg-live-dismiss [--grace <ms>]\n");
+            fprintf(stderr, "Usage: omarchy-ambient-dismiss [--grace <ms>]\n");
             return 1;
         }
     }
@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
 
     struct wl_display* display = wl_display_connect(NULL);
     if (!display) {
-        fprintf(stderr, "omarchy-bg-live-dismiss: cannot connect to the Wayland display\n");
+        fprintf(stderr, "omarchy-ambient-dismiss: cannot connect to the Wayland display\n");
         return 1;
     }
 
@@ -88,7 +88,7 @@ int main(int argc, char** argv) {
     wl_display_roundtrip(display);
 
     if (!seat || !notifier) {
-        fprintf(stderr, "omarchy-bg-live-dismiss: the compositor lacks %s\n",
+        fprintf(stderr, "omarchy-ambient-dismiss: the compositor lacks %s\n",
                 seat ? "ext_idle_notify_v1" : "a seat");
         return 1;
     }
@@ -101,7 +101,7 @@ int main(int argc, char** argv) {
                               : ext_idle_notifier_v1_get_idle_notification(notifier, grace, seat);
     ext_idle_notification_v1_add_listener(notification, &notification_listener, NULL);
     if (wl_display_roundtrip(display) < 0) {
-        fprintf(stderr, "omarchy-bg-live-dismiss: the compositor refused the idle notification\n");
+        fprintf(stderr, "omarchy-ambient-dismiss: the compositor refused the idle notification\n");
         return 1;
     }
 
@@ -110,6 +110,6 @@ int main(int argc, char** argv) {
 
     while (wl_display_dispatch(display) >= 0) {
     }
-    fprintf(stderr, "omarchy-bg-live-dismiss: lost the Wayland connection\n");
+    fprintf(stderr, "omarchy-ambient-dismiss: lost the Wayland connection\n");
     return 1;
 }

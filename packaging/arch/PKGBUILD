@@ -1,0 +1,33 @@
+# Maintainer: Andrés Villagrán <andres@villagranquiroz.cl>
+
+pkgname=omarchy-ambient
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Live backgrounds and screensavers for Omarchy: programs drawing behind the windows or over everything'
+arch=('x86_64' 'aarch64')
+url='https://github.com/avillagran/omarchy-ambient'
+license=('MIT')
+depends=('bash' 'jq' 'socat' 'inotify-tools' 'hyprland' 'wayland' 'libnotify' 'util-linux')
+makedepends=('git' 'wayland-protocols')
+optdepends=(
+  'fs-uae: the Amiga Demos source'
+  'curl: downloading the Amiga demos'
+  'libarchive: unpacking the Amiga demos'
+  'kitty: the Terminal Effects source'
+  'ghostty: the Terminal Effects source'
+)
+source=("git+$url.git#tag=v$pkgver")
+sha256sums=('SKIP')
+
+build() {
+  make -C "$pkgname"
+}
+
+check() {
+  make -C "$pkgname" test
+}
+
+package() {
+  make -C "$pkgname" DESTDIR="$pkgdir" PREFIX=/usr install
+  install -Dm644 "$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

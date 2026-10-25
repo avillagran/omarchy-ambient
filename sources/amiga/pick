@@ -2,8 +2,8 @@
 
 # Offers each demo by its preview and title, and prints the chosen demo's id.
 
-demos=$OMARCHY_BG_LIVE_DATA/demos
-previews=$OMARCHY_BG_LIVE_DATA/previews
+demos=$OMARCHY_AMBIENT_DATA/demos
+previews=$OMARCHY_AMBIENT_DATA/previews
 config= title= selected=
 
 rm -rf "$previews"

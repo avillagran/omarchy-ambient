@@ -4,17 +4,17 @@
 # Ghostty is made into one by the layer library. Both show the same effects
 # loop the Omarchy screensaver runs.
 
-effects="$OMARCHY_BG_LIVE_SOURCE_DIR/effects"
-font_size=${OMARCHY_BG_LIVE_SETTING_FONT_SIZE:-18}
+effects="$OMARCHY_AMBIENT_SOURCE_DIR/effects"
+font_size=${OMARCHY_AMBIENT_SETTING_FONT_SIZE:-18}
 
 if command -v kitty >/dev/null; then
   exec kitty +kitten panel --edge=center --layer=bottom --focus-policy=not-allowed \
-    --output-name="$OMARCHY_BG_LIVE_OUTPUT" --class="$OMARCHY_BG_LIVE_NAMESPACE" \
+    --output-name="$OMARCHY_AMBIENT_OUTPUT" --class="$OMARCHY_AMBIENT_NAMESPACE" \
     -o font_size="$font_size" -o window_padding_width=0 -o background=#000000 \
     -o background_opacity=1 -o cursor_shape=block -o cursor=#000000 "$effects"
 fi
 
 config=()
 [[ -r $OMARCHY_PATH/default/ghostty/screensaver ]] && config=(--config-file="$OMARCHY_PATH/default/ghostty/screensaver")
-exec omarchy-bg-live layer ghostty --gtk-single-instance=false --class=org.omarchy.bg-live \
+exec omarchy-ambient layer ghostty --gtk-single-instance=false --class=org.omarchy.ambient \
   "${config[@]}" --font-size="$font_size" -e "$effects"

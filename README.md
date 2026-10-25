@@ -1,15 +1,19 @@
-# omarchy-bg-live
+# omarchy-ambient
 
 Live backgrounds and screensavers for [Omarchy](https://omarchy.org): programs
 that draw behind your windows instead of a still image or a video, or over
 everything once you step away.
+
+It sits next to OWE, Omarchy's wallpaper engine, rather than replacing it:
+OWE plays images and videos, omarchy-ambient runs programs. While a live
+background is up, OWE is paused, and it resumes when the program ends.
 
 It comes with three:
 
 - **Omarchy Effects**: the Omarchy screensaver's ttfx effects drawn on the GPU
   by `omarchy-ttfx-layer`, which keeps its frame rate within what the
   computer can afford. It comes with the Omarchy Audio Background plugin, or
-  set `binary=` in `~/.config/omarchy/bg-live/ttfx.conf`.
+  set `binary=` in `~/.config/omarchy/ambient/ttfx.conf`.
 - **Amiga Demos**: classic demoscene productions running in FS-UAE. The demos
   are downloaded the first time you choose them. As a screensaver it goes
   through all of them, muted.
@@ -26,7 +30,7 @@ Anyone can add more: a terminal program, an emulator, a shader, a game. See
 
 Each live background is a program that draws its own layer surface on the
 bottom layer, behind the windows and above the regular wallpaper. Nothing is
-converted to video. A supervisor runs it as the `omarchy-bg-live` user unit
+converted to video. A supervisor runs it as the `omarchy-ambient` user unit
 and:
 
 - starts one program per monitor (or one in total), and follows monitors
@@ -41,40 +45,40 @@ and:
 ## Usage
 
 ```sh
-omarchy-bg-live list                    # the sources, as menu rows
-omarchy-bg-live start screensaver       # start one, in the background
-omarchy-bg-live start amiga             # pick a demo first
-omarchy-bg-live status                  # what is running, or "none"
-omarchy-bg-live stop
+omarchy-ambient list                    # the sources, as menu rows
+omarchy-ambient start screensaver       # start one, in the background
+omarchy-ambient start amiga             # pick a demo first
+omarchy-ambient status                  # what is running, or "none"
+omarchy-ambient stop
 ```
 
 ### In Omarchy's menus
 
-Omarchy releases that know about omarchy-bg-live list the sources under
+Omarchy releases that know about omarchy-ambient list the sources under
 **Appearance › Live Background** and **Appearance › Branding › Screensaver**
 by themselves. On the others, one command adds the same rows to your menu
-extension and routes the idle screensaver through omarchy-bg-live:
+extension and routes the idle screensaver through omarchy-ambient:
 
 ```sh
-omarchy-bg-live omarchy install     # menu rows, and the idle service routed
-omarchy-bg-live omarchy status      # menu=yes|no|native idle=yes|no|native
-omarchy-bg-live omarchy uninstall   # Omarchy's own menu and idle service back
+omarchy-ambient install     # menu rows, and the idle service routed
+omarchy-ambient installed   # menu=yes|no|native idle=yes|no|native
+omarchy-ambient remove      # Omarchy's own menu and idle service back
 ```
 
 The rows go between two marked lines in
 `~/.config/omarchy/extensions/omarchy-menu.jsonc`, and nothing else in that
 file changes. The idle service is cloned into
-`~/.config/omarchy/plugins/omarchy-bg-live.idle`, because Omarchy's idle
+`~/.config/omarchy/plugins/omarchy-ambient.idle`, because Omarchy's idle
 service runs its own screensaver launcher by a path no user file can
 override. Run `install` again after adding a source, so it gets a row.
 
 ### As the screensaver
 
 ```sh
-omarchy-bg-live screensaver --set amiga   # use it at the idle timeout
-omarchy-bg-live screensaver               # run it now; any activity ends it
-omarchy-bg-live screensaver --get         # the selected one, or "text"
-omarchy-bg-live screensaver --set text    # back to Omarchy's own
+omarchy-ambient screensaver --set amiga   # use it at the idle timeout
+omarchy-ambient screensaver               # run it now; any activity ends it
+omarchy-ambient screensaver --get         # the selected one, or "text"
+omarchy-ambient screensaver --set text    # back to Omarchy's own
 ```
 
 A screensaver covers every monitor with the keyboard to itself and the cursor
@@ -90,12 +94,20 @@ Building needs a C compiler, `wayland-scanner` and `wayland-protocols`:
 ```sh
 make
 make install PREFIX=~/.local
-omarchy-bg-live omarchy install
+omarchy-ambient install
 ```
 
 At run time it needs `bash`, `jq`, `socat`, `inotifywait` (inotify-tools) and
 Hyprland. Each source lists what else it needs, and offers to install it the
 first time it starts.
+
+### Coming from omarchy-bg-live
+
+This was called omarchy-bg-live at first. `make install` removes the old
+program, the first run moves `~/.config/omarchy/bg-live` and
+`~/.local/share/omarchy-bg-live` over, and `omarchy-ambient install` swaps the
+old menu rows and idle clone for the new ones. `omarchy-ambient omarchy
+install|uninstall|status` still work.
 
 ## Tests
 

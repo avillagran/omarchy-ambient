@@ -1,15 +1,22 @@
 #!/bin/bash
 
 # One renderer per output. The output, its size, the layer, the keyboard mode
-# and the namespace reach it through the OMARCHY_BG_LIVE_* environment.
+# and the namespace reach it through the OMARCHY_AMBIENT_* environment.
 
 args=(
-  --effects "${OMARCHY_BG_LIVE_SETTING_EFFECTS:-matrix,decrypt,rings,thunderstorm}"
-  --rotate "${OMARCHY_BG_LIVE_SETTING_ROTATE:-30}"
-  --fps "${OMARCHY_BG_LIVE_SETTING_FPS:-auto}"
-  --text "${OMARCHY_BG_LIVE_SETTING_TEXT:-OMARCHY}"
-  --resolution "${OMARCHY_BG_LIVE_SETTING_RESOLUTION:-2}"
+  --effects "${OMARCHY_AMBIENT_SETTING_EFFECTS:-matrix,decrypt,rings,thunderstorm}"
+  --rotate "${OMARCHY_AMBIENT_SETTING_ROTATE:-30}"
+  --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}"
+  --text "${OMARCHY_AMBIENT_SETTING_TEXT:-OMARCHY}"
+  --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-2}"
 )
-[[ ${OMARCHY_BG_LIVE_SETTING_AUDIO:-0} == 1 ]] && args+=(--audio)
+[[ ${OMARCHY_AMBIENT_SETTING_AUDIO:-0} == 1 ]] && args+=(--audio)
 
-exec "$OMARCHY_BG_LIVE_DATA/bin/omarchy-ttfx-layer" "${args[@]}"
+# omarchy-ttfx-layer still reads them under the engine's former name,
+# omarchy-bg-live.
+for name in OUTPUT WIDTH HEIGHT SCALE NAMESPACE LAYER KEYBOARD; do
+  new=OMARCHY_AMBIENT_$name
+  export "OMARCHY_BG_LIVE_$name=${!new}"
+done
+
+exec "$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer" "${args[@]}"

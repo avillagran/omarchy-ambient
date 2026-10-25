@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# omarchy-bg-live layer turns mpv's window into the background of the output
+# omarchy-ambient layer turns mpv's window into the background of the output
 # the supervisor names.
-exec omarchy-bg-live layer mpv --really-quiet --no-audio --no-osc --no-input-default-bindings \
-  --loop=inf "av://lavfi:mandelbrot=size=${OMARCHY_BG_LIVE_SETTING_RESOLUTION:-640x360}:rate=25"
+exec omarchy-ambient layer mpv --really-quiet --no-audio --no-osc --no-input-default-bindings \
+  --loop=inf "av://lavfi:mandelbrot=size=${OMARCHY_AMBIENT_SETTING_RESOLUTION:-640x360}:rate=25"

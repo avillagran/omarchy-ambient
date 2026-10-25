@@ -7,7 +7,7 @@
 #
 #   test/hardware/screensaver-check.sh <source> [cycles]
 #
-# Needs omarchy-bg-live on PATH, wtype, and make -C test/hardware for the
+# Needs omarchy-ambient on PATH, wtype, and make -C test/hardware for the
 # virtual pointer. It draws on the screen: run it where nobody is working.
 
 source_id=${1:?Usage: screensaver-check.sh <source> [cycles]}
@@ -22,21 +22,21 @@ check() {
   if "${@:2}"; then echo "ok   $1"; else echo "FAIL $1"; failures=$((failures + 1)); fi
 }
 
-layers() { hyprctl layers -j | jq --arg ns "omarchy-bg-live-$source_id" '[.[] | .levels["3"][]? | select(.namespace == $ns)] | length'; }
+layers() { hyprctl layers -j | jq --arg ns "omarchy-ambient-$source_id" '[.[] | .levels["3"][]? | select(.namespace == $ns)] | length'; }
 monitors() { hyprctl monitors -j | jq length; }
 covered() { [[ $(layers) -ge $(monitors) ]]; }
 clean() {
-  [[ $(hyprctl layers -j | jq --arg ns "omarchy-bg-live-$source_id" '[.. | objects | select(.namespace? == $ns)] | length') == 0 ]] &&
+  [[ $(hyprctl layers -j | jq --arg ns "omarchy-ambient-$source_id" '[.. | objects | select(.namespace? == $ns)] | length') == 0 ]] &&
     ! hyprctl layers -j | jq -e '[.. | objects | select(.pid? == -1)] | length > 0' >/dev/null &&
     [[ $(hyprctl getoption cursor:invisible | head -n 1) == *false ]] &&
-    ! grep -qs . "${XDG_RUNTIME_DIR}/omarchy-bg-live/screensaver"
+    ! grep -qs . "${XDG_RUNTIME_DIR}/omarchy-ambient/screensaver"
 }
 wait_for() { local i; for ((i = 0; i < $2 * 10; i++)); do "$1" && return 0; sleep 0.1; done; return 1; }
 running() { kill -0 "$saver" 2>/dev/null; }
 stopped() { ! running; }
 
 start() {
-  omarchy-bg-live screensaver "$source_id" >>"${TMPDIR:-/tmp}/screensaver-check.log" 2>&1 &
+  omarchy-ambient screensaver "$source_id" >>"${TMPDIR:-/tmp}/screensaver-check.log" 2>&1 &
   saver=$!
   wait_for covered 30
 }
