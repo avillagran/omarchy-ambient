@@ -1,0 +1,8 @@
+#!/bin/bash
+
+# Only checks that there is something to run; this example never downloads.
+program=$OMARCHY_BG_LIVE_SETTING_PROGRAM
+if [[ ! -r $program ]]; then
+  echo "Set program= in ~/.config/omarchy/bg-live/c64.conf to a .prg, .d64 or .t64 you have" >&2
+  exit 1
+fi

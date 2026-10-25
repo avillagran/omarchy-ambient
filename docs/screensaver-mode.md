@@ -1,6 +1,7 @@
 # Screensaver mode (design contract)
 
-Status: agreed design, being implemented (2026-10-25). Two pieces are built
+Status: agreed design, engine side implemented (2026-10-25). The changes made
+while implementing it are listed at the end. Two pieces are built
 in parallel against this document: the engine side (supervisor, guard,
 Omarchy integration, Amiga source) and the `ttfx` source (the GPU layer
 renderer from omarchy-audio-background). Change this file first when the
@@ -43,7 +44,14 @@ Sources without `screensaver` never appear in the screensaver menu.
 | `OMARCHY_BG_LIVE_KEYBOARD` | `none` or `exclusive`. Same rule |
 
 `omarchy-bg-live layer` (the preload library) honors both variables, so
-programs started through it (FS-UAE, VICE, mpv) need no change.
+programs started through it (FS-UAE, VICE, mpv) need no change. It also
+keeps two requests from reaching the compositor: idle inhibitors, so live
+content never holds off the screensaver or the lock, and text input
+(`zwp_text_input_v3`). SDL enables text input whenever it gets the keyboard,
+that wakes the input method (fcitx5 in Omarchy), and Hyprland counts the input
+method's reply as user activity, which dismissed the screensaver each time a
+demo started. A program that creates its own layer surface should not bind
+text input either.
 
 In the screensaver placement the surface must cover the whole output and be
 opaque. With `exclusive` keyboard, keys never reach the application under
@@ -53,10 +61,15 @@ the screensaver.
 
 Default (`input=dismiss` in `source.conf`): the engine ends the screensaver
 on the first user activity. It does not depend on the content surface
-receiving input. A small helper subscribes to `ext_idle_notify_v1` with a
-short timeout, using the input-only notification so idle inhibitors do not
-mask activity, and exits on `resumed`. The engine then stops every `run`
-(SIGTERM, then SIGKILL after three seconds), restores the cursor and exits 0.
+receiving input. A small helper, `omarchy-bg-live-dismiss` (`build/` in a
+checkout, `lib/omarchy-bg-live/` when installed), subscribes to
+`ext_idle_notify_v1` with a short timeout, using the input-only notification
+so idle inhibitors do not mask activity, prints `ready`, and prints `activity`
+and exits on `resumed`. The engine covers nothing until the helper is ready,
+and refuses to start when it is not within five seconds, so a screensaver
+never takes the keyboard without a way to end it. On activity it stops every
+`run` (SIGTERM, then SIGKILL after three seconds), restores the cursor and
+exits 0.
 
 Because dismissal does not depend on which surface is on top, a source may
 restart its program or remap its surface (a demo transition) at any time.
@@ -77,7 +90,12 @@ omarchy-bg-live screensaver                 # run the selected screensaver, fore
 omarchy-bg-live screensaver <id> [choice]   # run a specific one (menu "Preview")
 omarchy-bg-live screensaver --get           # selected source id, or "text" for the stock one
 omarchy-bg-live screensaver --set <id>      # select it; "text" restores the stock screensaver
+omarchy-bg-live list screensaver            # menu rows: the sources with screensaver in placements
 ```
+
+- `--set` installs what the source needs and runs its `prepare` (the Amiga
+  download) before it selects it, so the idle path never installs or
+  downloads. Without a choice the screensaver skips `pick`.
 
 - The selection lives in `~/.config/omarchy/bg-live/screensaver.conf` as
   `source=<id>`. Settings for a source in the screensaver placement are read
@@ -92,7 +110,10 @@ omarchy-bg-live screensaver --set <id>      # select it; "text" restores the sto
   way `omarchy-screensaver` does it
   (`hyprctl eval 'hl.config({ cursor = { invisible = true } })'`).
 - On session lock the screensaver ends; the lock screen takes over, as with
-  the stock screensaver.
+  the stock screensaver. Hyprland sends no event for it, so the screensaver
+  looks every two seconds (a live background every five).
+- A live background with `pause=none` keeps running under it, as it keeps
+  running everywhere else.
 
 ## Omarchy integration
 
@@ -111,7 +132,14 @@ does not override it, and nothing may be installed under `/usr`.
 - The idle service cancels the pending lock when the screensaver window
   closes, keyed on the `org.omarchy.screensaver` class. A layer has no
   window. User activity already wakes the idle monitor, which cancels the
-  cycle, so dismissal keeps working; verify it on the test machine.
+  cycle, so dismissal keeps working. Verified on mbp-intel through a cloned
+  idle service (`test/hardware/trial-idle.sh`): the dismissal logs
+  `idle-cycle-cancel: activity` and no lock follows, and when the lock
+  timeout comes with the screensaver up, the lock takes over and the
+  screensaver ends about two seconds later.
+- The proposed change to the Omarchy fork is
+  [`docs/omarchy/screensaver-launcher-and-menu.patch`](omarchy/screensaver-launcher-and-menu.patch),
+  explained in [`docs/omarchy/README.md`](omarchy/README.md).
 - Menu: Style › Screensaver lists the stock text screensaver plus every
   source with `screensaver` in `placements`, and a Preview entry.
 
@@ -151,3 +179,15 @@ Everything is tested on mbp-intel (2015 MacBook Pro, Iris 6100, Hyprland
 - no layer is left behind (`hyprctl layers`, no `pid: -1`);
 - CPU, GPU busy and temperature while it runs, against the stock
   foot + ttfx screensaver.
+
+## Changes made while implementing it
+
+- Text input is stubbed by the layer library, besides idle inhibitors (see
+  "What `run` gets"). Found on mbp-intel: without it, every FS-UAE start
+  inside the screensaver dismissed it.
+- The dismiss helper's name, output and failure rule are fixed (see
+  "Dismissal"), and the engine refuses to run without it.
+- `list screensaver` was added for the menu, and `--set` prepares the source.
+- The session lock is noticed by polling, within two seconds.
+- `pause=none` backgrounds are not frozen under the screensaver.
+

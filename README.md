@@ -1,13 +1,15 @@
 # omarchy-bg-live
 
-Live backgrounds for [Omarchy](https://omarchy.org): programs that draw behind
-your windows instead of a still image or a video.
+Live backgrounds and screensavers for [Omarchy](https://omarchy.org): programs
+that draw behind your windows instead of a still image or a video, or over
+everything once you step away.
 
 It comes with two:
 
 - **Screensaver**: the Omarchy screensaver's ttfx effects, on every monitor.
 - **Amiga Demos**: classic demoscene productions running in FS-UAE. The demos
-  are downloaded the first time you choose them.
+  are downloaded the first time you choose them. As a screensaver it goes
+  through all of them, muted.
 
 Anyone can add more: a terminal program, an emulator, a shader, a game. See
 [Creating a live background](docs/creating-sources.md).
@@ -40,6 +42,21 @@ omarchy-bg-live stop
 
 In Omarchy, the sources appear under **Style › Background**.
 
+### As the screensaver
+
+```sh
+omarchy-bg-live screensaver --set amiga   # use it at the idle timeout
+omarchy-bg-live screensaver               # run it now; any activity ends it
+omarchy-bg-live screensaver --get         # the selected one, or "text"
+omarchy-bg-live screensaver --set text    # back to Omarchy's own
+```
+
+A screensaver covers every monitor with the keyboard to itself and the cursor
+hidden, ends on the first mouse motion, click, scroll or key, and gives way to
+the lock screen. Omarchy's launcher has to hand over to it; see
+[docs/omarchy](docs/omarchy/README.md). The design is in
+[docs/screensaver-mode.md](docs/screensaver-mode.md).
+
 ## Install
 
 Building needs a C compiler, `wayland-scanner` and `wayland-protocols`:
@@ -58,6 +75,10 @@ first time it starts.
 ```sh
 make test
 ```
+
+`test/hardware` has what it takes to try the screensaver on a real Hyprland
+session: a virtual pointer to dismiss it, and a script that routes Omarchy's
+idle cycle through it on a test machine and undoes that afterwards.
 
 ## License
 

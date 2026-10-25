@@ -19,9 +19,10 @@ play() {
   mkdir -p "$state"
   cp "${config%/*}"/state/*.uss "$state/Saved State 1.uss"
 
-  # SDL would otherwise inhibit idle, keeping the lock screen away.
+  # SDL would otherwise inhibit idle, keeping the lock screen away. FS-UAE
+  # keeps its logs and caches under the source's data, not in ~/Documents.
   SDL_VIDEODRIVER=wayland SDL_VIDEO_ALLOW_SCREENSAVER=1 omarchy-bg-live layer fs-uae "$config" \
-    --state-dir="$state" --load-state=1 --volume=0 \
+    --base-dir="$OMARCHY_BG_LIVE_DATA/fs-uae" --state-dir="$state" --load-state=1 --volume=0 \
     --fullscreen=0 --borderless=1 --keep-aspect=0 \
     --window-width="${OMARCHY_BG_LIVE_WIDTH:-1920}" --window-height="${OMARCHY_BG_LIVE_HEIGHT:-1080}" \
     --automatic-input-grab=0 --initial-input-grab=0 --keyboard-input-grab=0 &
