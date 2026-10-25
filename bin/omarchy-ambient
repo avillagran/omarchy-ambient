@@ -763,15 +763,24 @@ omarchy_status() {
   echo "menu=$menu idle=$idle"
 }
 
-# The settings and downloads of omarchy-bg-live move over once. Its launcher
-# for the idle service goes with them, and install writes a new one.
-if [[ -d $LEGACY_CONFIG_DIR && ! -e $CONFIG_DIR ]]; then
-  mv "$LEGACY_CONFIG_DIR" "$CONFIG_DIR"
-fi
-if [[ -d $LEGACY_DATA_DIR && ! -e $DATA_DIR ]]; then
-  mv "$LEGACY_DATA_DIR" "$DATA_DIR"
-  rm -f "$LAUNCHER"
-fi
+# The settings and downloads of omarchy-bg-live move over once, one entry at
+# a time: installed with PREFIX=~/.local, the data directory already holds
+# the bundled sources. The old launcher for the idle service stays behind,
+# and install writes a new one.
+move_legacy() {
+  local from=$1 to=$2 entry
+  [[ -d $from ]] || return 0
+  mkdir -p "$to"
+  for entry in "$from"/* "$from"/.[!.]*; do
+    [[ -e $entry || -L $entry ]] || continue
+    [[ $entry == "$LEGACY_DATA_DIR/omarchy" || $entry == "$LEGACY_DATA_DIR/sources" ]] && continue
+    [[ -e $to/${entry##*/} ]] || mv "$entry" "$to/"
+  done
+  rm -rf "$LEGACY_DATA_DIR/omarchy" "$LEGACY_DATA_DIR/sources"
+  rmdir "$from" 2>/dev/null
+}
+move_legacy "$LEGACY_CONFIG_DIR" "$CONFIG_DIR"
+move_legacy "$LEGACY_DATA_DIR" "$DATA_DIR"
 
 usage="Usage: omarchy-ambient list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | install | remove | installed | check <source-dir> | layer <command...>"
 

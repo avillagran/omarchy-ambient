@@ -152,7 +152,9 @@ assert_eq "omarchy uninstall still removes" "$("$AMBIENT" installed)" "menu=no i
 # clone.
 legacy_plugin=$XDG_CONFIG_HOME/omarchy/plugins/omarchy-bg-live.idle
 rm -rf "$XDG_CONFIG_HOME/omarchy/ambient" "$XDG_DATA_HOME/omarchy-ambient"
-mkdir -p "$XDG_CONFIG_HOME/omarchy/bg-live" "$XDG_DATA_HOME/omarchy-bg-live/demo" "$legacy_plugin"
+# Installed with PREFIX=~/.local, both data directories hold bundled sources.
+mkdir -p "$XDG_CONFIG_HOME/omarchy/bg-live" "$XDG_DATA_HOME/omarchy-bg-live/demo" "$legacy_plugin" \
+  "$XDG_DATA_HOME/omarchy-bg-live/sources/old" "$XDG_DATA_HOME/omarchy-bg-live/omarchy" "$XDG_DATA_HOME/omarchy-ambient/sources/new"
 echo source=demo >"$XDG_CONFIG_HOME/omarchy/bg-live/screensaver.conf"
 echo downloaded >"$XDG_DATA_HOME/omarchy-bg-live/demo/pack"
 echo '{"id":"omarchy-bg-live.idle","omarchy":{"clonedFrom":"omarchy.idle"}}' >"$legacy_plugin/manifest.json"
@@ -166,6 +168,8 @@ PY
 assert_eq "the old selection is read" "$("$AMBIENT" screensaver --get)" "demo"
 assert "the old settings moved" test ! -e "$XDG_CONFIG_HOME/omarchy/bg-live"
 assert_eq "the old downloads moved" "$(cat "$XDG_DATA_HOME/omarchy-ambient/demo/pack")" "downloaded"
+assert "next to the bundled sources" test -d "$XDG_DATA_HOME/omarchy-ambient/sources/new"
+assert "the old bundled sources and launcher are dropped" test ! -e "$XDG_DATA_HOME/omarchy-bg-live"
 "$AMBIENT" install >"$scratch/out" 2>&1
 assert "the old menu rows are gone" bash -c "! grep -q 'omarchy-bg-live' '$extension'"
 assert_eq "and the new ones are in" "$(row style.live-background label)" "Live Background"

@@ -46,7 +46,9 @@ install: $(LAYER) $(DISMISS)
 	install -Dm755 $(DISMISS) $(DESTDIR)$(PREFIX)/lib/omarchy-ambient/omarchy-ambient-dismiss
 	mkdir -p $(DESTDIR)$(PREFIX)/share/omarchy-ambient
 	cp -r sources $(DESTDIR)$(PREFIX)/share/omarchy-ambient/
-	rm -rf $(DESTDIR)$(PREFIX)/bin/omarchy-bg-live $(DESTDIR)$(PREFIX)/lib/omarchy-bg-live $(DESTDIR)$(PREFIX)/share/omarchy-bg-live
+	# What omarchy-bg-live installed. Not all of share/omarchy-bg-live: with
+	# PREFIX=~/.local that is where the sources keep their downloads too.
+	rm -rf $(DESTDIR)$(PREFIX)/bin/omarchy-bg-live $(DESTDIR)$(PREFIX)/lib/omarchy-bg-live $(DESTDIR)$(PREFIX)/share/omarchy-bg-live/sources
 
 uninstall:
 	rm -rf $(DESTDIR)$(PREFIX)/bin/omarchy-ambient $(DESTDIR)$(PREFIX)/lib/omarchy-ambient $(DESTDIR)$(PREFIX)/share/omarchy-ambient
