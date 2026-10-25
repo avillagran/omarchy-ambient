@@ -7,7 +7,7 @@ pkgdesc='Live backgrounds and screensavers for Omarchy: programs drawing behind 
 arch=('x86_64' 'aarch64')
 url='https://github.com/avillagran/omarchy-ambient'
 license=('MIT')
-depends=('bash' 'jq' 'socat' 'inotify-tools' 'hyprland' 'wayland' 'libnotify' 'util-linux')
+depends=('glibc' 'bash' 'jq' 'socat' 'inotify-tools' 'hyprland' 'wayland' 'libnotify' 'util-linux')
 makedepends=('git' 'wayland-protocols')
 optdepends=(
   'fs-uae: the Amiga Demos source'

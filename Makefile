@@ -35,10 +35,10 @@ $(BUILD)/%.c: | $(BUILD)
 	wayland-scanner private-code $(filter %/$*.xml,$(XML)) $@
 
 $(LAYER): $(SOURCES) $(call protocol_headers,$(LAYER_XML))
-	$(CC) $(CFLAGS) -shared -o $@ $(SOURCES) $(LDLIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -shared -o $@ $(SOURCES) $(LDLIBS)
 
 $(DISMISS): $(DISMISS_SOURCES) $(call protocol_headers,$(DISMISS_XML))
-	$(CC) $(CFLAGS) -o $@ $(DISMISS_SOURCES) $(LDLIBS)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $(DISMISS_SOURCES) $(LDLIBS)
 
 install: $(LAYER) $(DISMISS)
 	install -Dm755 bin/omarchy-ambient $(DESTDIR)$(PREFIX)/bin/omarchy-ambient
