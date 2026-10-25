@@ -40,7 +40,25 @@ omarchy-bg-live status                  # what is running, or "none"
 omarchy-bg-live stop
 ```
 
-In Omarchy, the sources appear under **Style › Background**.
+### In Omarchy's menus
+
+Omarchy releases that know about omarchy-bg-live list the sources under
+**Appearance › Live Background** and **Appearance › Branding › Screensaver**
+by themselves. On the others, one command adds the same rows to your menu
+extension and routes the idle screensaver through omarchy-bg-live:
+
+```sh
+omarchy-bg-live omarchy install     # menu rows, and the idle service routed
+omarchy-bg-live omarchy status      # menu=yes|no|native idle=yes|no|native
+omarchy-bg-live omarchy uninstall   # Omarchy's own menu and idle service back
+```
+
+The rows go between two marked lines in
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`, and nothing else in that
+file changes. The idle service is cloned into
+`~/.config/omarchy/plugins/omarchy-bg-live.idle`, because Omarchy's idle
+service runs its own screensaver launcher by a path no user file can
+override. Run `install` again after adding a source, so it gets a row.
 
 ### As the screensaver
 
@@ -64,6 +82,7 @@ Building needs a C compiler, `wayland-scanner` and `wayland-protocols`:
 ```sh
 make
 make install PREFIX=~/.local
+omarchy-bg-live omarchy install
 ```
 
 At run time it needs `bash`, `jq`, `socat`, `inotifywait` (inotify-tools) and

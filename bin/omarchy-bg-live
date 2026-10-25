@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # omarchy:summary=Run a live program (screensaver, Amiga demo, game...) as the background or the screensaver
-# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | check <source-dir> | layer <command...>
+# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | omarchy install|uninstall|status | check <source-dir> | layer <command...>
 # omarchy:examples=omarchy-bg-live start screensaver
 
 # A live background is a program drawing behind the windows instead of a still
@@ -549,7 +549,202 @@ check() {
   echo "$id: ok"
 }
 
-usage="Usage: omarchy-bg-live list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | check <source-dir> | layer <command...>"
+# Omarchy integration for releases that don't offer live backgrounds and
+# screensavers themselves yet. `omarchy install` adds the menu rows to the
+# user's menu extension, between markers, and routes the idle screensaver
+# through omarchy-bg-live with a clone of Omarchy's idle service. Both are
+# skipped when Omarchy does it natively, and `omarchy uninstall` undoes them.
+OMARCHY_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy
+MENU_EXTENSION=$OMARCHY_DIR/extensions/omarchy-menu.jsonc
+IDLE_ID=omarchy-bg-live.idle
+IDLE_PLUGIN=$OMARCHY_DIR/plugins/$IDLE_ID
+LAUNCHER=$DATA_DIR/omarchy/omarchy-launch-screensaver
+MENU_BEGIN="// >>> omarchy-bg-live: added by \"omarchy-bg-live omarchy install\", removed by \"omarchy-bg-live omarchy uninstall\""
+MENU_END="// <<< omarchy-bg-live"
+
+omarchy_menu() {
+  echo "${OMARCHY_PATH:-/usr/share/omarchy}/default/omarchy/omarchy-menu.jsonc"
+}
+
+# The menu ids differ between Omarchy releases: Style in 4.0, Appearance later.
+menu_has() {
+  grep -q "^[[:space:]]*\"$1\"[[:space:]]*:" "$(omarchy_menu)" 2>/dev/null
+}
+
+native_menu() {
+  grep -q '"provider":"screensaver-sources"' "$(omarchy_menu)" 2>/dev/null
+}
+
+native_launcher() {
+  grep -q 'omarchy-bg-live' "${OMARCHY_PATH:-/usr/share/omarchy}/bin/omarchy-launch-screensaver" 2>/dev/null
+}
+
+# One "id": {row} line per menu row, built with jq so every string is
+# escaped properly.
+menu_rows() {
+  local style screensaver id dir name icon description
+  if menu_has appearance.background; then style=appearance; else style=style; fi
+  if menu_has appearance.branding.screensaver; then
+    screensaver=appearance.branding.screensaver
+  else
+    screensaver=style.screensaver
+  fi
+
+  row() { jq -cn --arg id "$1" --arg label "$2" --arg icon "$3" --arg description "$4" --arg checked "$5" --arg action "$6" \
+    '{($id): ({icon: $icon, label: $label, description: $description, checked: $checked, action: $action} | with_entries(select(.value != "")))}' |
+    sed 's/^{\(.*\)}$/  \1,/'; }
+
+  row "$style.live-background" "Live Background" "󰸉"
+  row "$style.live-background.none" "None" "󰅖" "" "[[ \$($self status) == none ]]" "$self stop"
+  while read -r id; do
+    dir=$(source_dir "$id")
+    supports "$id" "$dir" background || continue
+    name=$(setting "$id" "$dir" name "$id") icon=$(setting "$id" "$dir" icon 󰸉) description=$(setting "$id" "$dir" description)
+    row "$style.live-background.$id" "$name" "$icon" "$description" \
+      "[[ \$($self status | cut -d ' ' -f 1) == $id ]]" "$self start $id"
+  done < <(source_ids)
+
+  row "$screensaver.live-text" "Text Effects" "󱄄" "The stock Omarchy screensaver" \
+    "[[ \$($self screensaver --get) == text ]]" "$self screensaver --set text"
+  while read -r id; do
+    dir=$(source_dir "$id")
+    supports "$id" "$dir" screensaver || continue
+    name=$(setting "$id" "$dir" name "$id") icon=$(setting "$id" "$dir" icon 󱄄) description=$(setting "$id" "$dir" description)
+    row "$screensaver.live-$id" "$name" "$icon" "$description" \
+      "[[ \$($self screensaver --get) == $id ]]" "$self screensaver --set $id"
+  done < <(source_ids)
+  if ! native_launcher; then
+    row "$screensaver.live-preview" "Preview" "" "" "" "$LAUNCHER force"
+    row "system.screensaver" "Screensaver" "󱄄" "" "" "$LAUNCHER force"
+  fi
+}
+
+# Drops the marked block from the menu extension, keeping everything else.
+remove_menu_rows() {
+  [[ -f $MENU_EXTENSION ]] || return 0
+  local temp
+  temp=$(mktemp "$MENU_EXTENSION.XXXXXX")
+  BEGIN_MARK=$MENU_BEGIN END_MARK=$MENU_END awk '
+    $0 == ENVIRON["BEGIN_MARK"] { skip = 1; next }
+    $0 == ENVIRON["END_MARK"] { skip = 0; next }
+    !skip' "$MENU_EXTENSION" >"$temp"
+  mv -f "$temp" "$MENU_EXTENSION"
+}
+
+# Puts the block right after the extension's opening brace, so no line of the
+# user's changes, and rows of their own with the same ids still win. The menu
+# reads JSONC, which allows the trailing comma the block ends with.
+add_menu_rows() {
+  local rows=$1 temp
+  mkdir -p "${MENU_EXTENSION%/*}"
+  [[ -s $MENU_EXTENSION ]] || printf '{\n}\n' >"$MENU_EXTENSION"
+  grep -q '^[[:space:]]*{' "$MENU_EXTENSION" || { echo "$MENU_EXTENSION has no opening brace; not touching it" >&2; return 1; }
+  temp=$(mktemp "$MENU_EXTENSION.XXXXXX")
+  # Through the environment: awk -v would take the backslashes in the rows
+  # for escapes.
+  BEGIN_MARK=$MENU_BEGIN END_MARK=$MENU_END ROWS=$rows awk '
+    { print }
+    !done && /^[[:space:]]*\{/ { print ENVIRON["BEGIN_MARK"]; print ENVIRON["ROWS"]; print ENVIRON["END_MARK"]; done = 1 }' \
+    "$MENU_EXTENSION" >"$temp"
+  mv -f "$temp" "$MENU_EXTENSION"
+}
+
+install_launcher() {
+  mkdir -p "${LAUNCHER%/*}"
+  cat >"$LAUNCHER" <<EOF
+#!/bin/bash
+# Installed by "omarchy-bg-live omarchy install"; "omarchy-bg-live omarchy uninstall" removes it.
+# Runs the live screensaver when one is chosen, and Omarchy's own otherwise.
+if omarchy-toggle-enabled screensaver-off && [[ \$1 != force ]]; then
+  exit 1
+fi
+if [[ \${2:-} != text ]] && [[ \$($(printf %q "$self") screensaver --get 2>/dev/null) != text ]]; then
+  exec $(printf %q "$self") screensaver
+fi
+exec omarchy-launch-screensaver "\$@"
+EOF
+  chmod 755 "$LAUNCHER"
+}
+
+# Another clone of the idle service (an older Amiga screensaver, the user's
+# own) already replaces Omarchy's; two would both run screensavers.
+other_idle_clone() {
+  omarchy plugin list --json 2>/dev/null |
+    jq -r --arg ours "$IDLE_ID" '.[] | select(.enabled and .clonedFrom == "omarchy.idle" and .id != $ours) | .id' | head -n 1
+}
+
+install_idle() {
+  local source=${OMARCHY_PATH:-/usr/share/omarchy}/shell/plugins/services/idle stage other
+  other=$(other_idle_clone)
+  [[ -z $other ]] || { echo "The idle service is already replaced by $other; leaving it alone" >&2; return 1; }
+  grep -q '|| omarchy-launch-screensaver")' "$source/Service.qml" 2>/dev/null ||
+    { echo "This Omarchy's idle service is not one omarchy-bg-live knows how to route" >&2; return 1; }
+
+  rm -rf "$IDLE_PLUGIN"
+  mkdir -p "${IDLE_PLUGIN%/*}"
+  stage=$(mktemp -d "${IDLE_PLUGIN%/*}/.omarchy-bg-live.XXXXXX")
+  cp -aL "$source/." "$stage/"
+  sed -i "s#|| omarchy-launch-screensaver\")#|| \\\\\"$LAUNCHER\\\\\"\")#" "$stage/Service.qml"
+  jq --arg id "$IDLE_ID" '.id = $id | .name = "Idle (live screensavers)" |
+    .omarchy = ((.omarchy // {}) + {clonedFrom: "omarchy.idle"})' "$stage/manifest.json" >"$stage/manifest.json.tmp"
+  mv "$stage/manifest.json.tmp" "$stage/manifest.json"
+  mv "$stage" "$IDLE_PLUGIN"
+
+  omarchy-shell -q shell rescanPlugins
+  local i
+  for ((i = 0; i < 40; i++)); do
+    omarchy plugin list --json 2>/dev/null | jq -e --arg id "$IDLE_ID" 'any(.[]; .id == $id)' >/dev/null && break
+    sleep 0.1
+  done
+  omarchy plugin enable "$IDLE_ID" >/dev/null 2>&1
+}
+
+uninstall_idle() {
+  [[ -d $IDLE_PLUGIN ]] || return 0
+  omarchy plugin disable "$IDLE_ID" >/dev/null 2>&1
+  rm -rf "$IDLE_PLUGIN"
+  omarchy-shell -q shell rescanPlugins
+  omarchy plugin enable omarchy.idle >/dev/null 2>&1
+}
+
+omarchy_install() {
+  local rows
+  remove_menu_rows
+  if native_menu; then
+    echo "menu: this Omarchy lists live backgrounds and screensavers itself"
+  else
+    rows=$(menu_rows) && add_menu_rows "$rows" && echo "menu: added to $MENU_EXTENSION"
+  fi
+
+  if native_launcher; then
+    uninstall_idle
+    echo "screensaver: this Omarchy hands over to omarchy-bg-live itself"
+  else
+    install_launcher
+    if [[ -d $IDLE_PLUGIN ]] || install_idle; then
+      echo "screensaver: the idle timeout runs $LAUNCHER"
+    fi
+  fi
+}
+
+omarchy_uninstall() {
+  remove_menu_rows
+  uninstall_idle
+  rm -f "$LAUNCHER"
+  rmdir "${LAUNCHER%/*}" 2>/dev/null
+  echo "removed; Omarchy's own menu and idle service are back"
+}
+
+omarchy_status() {
+  local menu=no idle=no
+  grep -qxF "$MENU_BEGIN" "$MENU_EXTENSION" 2>/dev/null && menu=yes
+  native_menu && menu=native
+  [[ -d $IDLE_PLUGIN ]] && idle=yes
+  native_launcher && idle=native
+  echo "menu=$menu idle=$idle"
+}
+
+usage="Usage: omarchy-bg-live list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | omarchy install|uninstall|status | check <source-dir> | layer <command...>"
 
 case $1 in
   list)
@@ -588,6 +783,14 @@ case $1 in
         ;;
       -*) echo "$usage" >&2; exit 1 ;;
       *) run_screensaver "$2" "$3" ;;
+    esac
+    ;;
+  omarchy)
+    case $2 in
+      install) omarchy_install ;;
+      uninstall) omarchy_uninstall ;;
+      status) omarchy_status ;;
+      *) echo "Usage: omarchy-bg-live omarchy install|uninstall|status" >&2; exit 1 ;;
     esac
     ;;
   check)
