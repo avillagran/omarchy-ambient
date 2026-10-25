@@ -1,22 +1,69 @@
 #!/bin/bash
 
-# Plays a demo in FS-UAE from the saved state the pack ships, so it starts on
-# its first effect instead of the boot screens. Without a choice, each output
-# gets a random demo.
+# Plays demos in FS-UAE from the saved states the pack ships, so each starts
+# on its first effect instead of the boot screens, muted.
+#
+# As a background it plays the chosen demo, or a random one without a choice.
+# As a screensaver it plays the chosen demo first, then the others in a random
+# order without repeats, each for as long as the pack measured it runs and at
+# most max_demo_seconds. The next demo starts before the last one ends, so the
+# desktop never shows between them.
 
 demos=$OMARCHY_BG_LIVE_DATA/demos
-demo=$1
 
-if [[ ! -r $demos/$demo/config.json ]]; then
-  demo=$(find "$demos" -mindepth 2 -maxdepth 2 -name config.json -printf '%h\n' | shuf -n 1)
-  demo=${demo##*/}
+# play <demo> <slot>: starts FS-UAE on the demo in the background. Two slots,
+# so the next demo restores its state while the last one still shows.
+play() {
+  local config state=$OMARCHY_BG_LIVE_RUNTIME/$2
+  config="$demos/$1/$(jq -r '.variants[0].config' "$demos/$1/config.json")"
+  mkdir -p "$state"
+  cp "${config%/*}"/state/*.uss "$state/Saved State 1.uss"
+
+  # SDL would otherwise inhibit idle, keeping the lock screen away.
+  SDL_VIDEODRIVER=wayland SDL_VIDEO_ALLOW_SCREENSAVER=1 omarchy-bg-live layer fs-uae "$config" \
+    --state-dir="$state" --load-state=1 --volume=0 \
+    --fullscreen=0 --borderless=1 --keep-aspect=0 \
+    --window-width="${OMARCHY_BG_LIVE_WIDTH:-1920}" --window-height="${OMARCHY_BG_LIVE_HEIGHT:-1080}" \
+    --automatic-input-grab=0 --initial-input-grab=0 --keyboard-input-grab=0 &
+}
+
+# How long a demo plays: the pack's measurement, capped.
+duration() {
+  local seconds maximum=${OMARCHY_BG_LIVE_SETTING_MAX_DEMO_SECONDS:-600}
+  seconds=$(jq -r '.variants[0].playback.duration_seconds // empty' "$demos/$1/config.json")
+  [[ $seconds =~ ^[0-9]+$ ]] && ((seconds < maximum)) && echo "$seconds" || echo "$maximum"
+}
+
+mapfile -t order < <(find "$demos" -mindepth 2 -maxdepth 2 -name config.json -printf '%h\n' | xargs -rn 1 basename | shuf)
+((${#order[@]} > 0)) || { echo "There are no demos in $demos" >&2; exit 1; }
+if [[ -r $demos/$1/config.json ]]; then
+  order=("$1" $(printf '%s\n' "${order[@]}" | grep -vx "$1"))
 fi
 
-config="$demos/$demo/$(jq -r '.variants[0].config' "$demos/$demo/config.json")"
-cp "${config%/*}"/state/*.uss "$OMARCHY_BG_LIVE_RUNTIME/Saved State 1.uss"
+if [[ $OMARCHY_BG_LIVE_PLACEMENT != screensaver ]]; then
+  play "${order[0]}" 0
+  wait $!
+  exit
+fi
 
-SDL_VIDEODRIVER=wayland exec omarchy-bg-live layer fs-uae "$config" \
-  --state-dir="$OMARCHY_BG_LIVE_RUNTIME" --load-state=1 --volume=0 \
-  --fullscreen=0 --borderless=1 --keep-aspect=0 \
-  --window-width="${OMARCHY_BG_LIVE_WIDTH:-1920}" --window-height="${OMARCHY_BG_LIVE_HEIGHT:-1080}" \
-  --automatic-input-grab=0 --initial-input-grab=0 --keyboard-input-grab=0
+shown=0 previous=
+while :; do
+  demo=${order[shown % ${#order[@]}]}
+  play "$demo" $((shown % 2))
+  current=$!
+  if [[ -n $previous ]]; then
+    sleep "${OMARCHY_BG_LIVE_SETTING_TRANSITION_SECONDS:-3}"
+    kill "$previous" 2>/dev/null
+    wait "$previous"
+  fi
+  echo "playing $demo"
+
+  sleep "$(duration "$demo")" &
+  timer=$!
+  wait -n "$current" "$timer"
+  kill "$timer" 2>/dev/null
+  # A demo that ended by itself leaves nothing to hand over from.
+  previous=$current
+  kill -0 "$current" 2>/dev/null || previous=
+  shown=$((shown + 1))
+done
