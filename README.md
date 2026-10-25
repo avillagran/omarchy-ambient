@@ -96,9 +96,16 @@ first time it starts.
 make test
 ```
 
-`test/hardware` has what it takes to try the screensaver on a real Hyprland
-session: a virtual pointer to dismiss it, and a script that routes Omarchy's
-idle cycle through it on a test machine and undoes that afterwards.
+`test/hardware` checks it all on a real Hyprland session, with nobody at the
+keyboard (a virtual pointer and `wtype` stand in for the user). They draw on
+the screen, so run them where nobody is working:
+
+```sh
+make -C test/hardware
+test/hardware/screensaver-check.sh amiga 20   # every input ends it, nothing reaches the window under it, 20 cycles
+test/hardware/background-check.sh amiga       # bottom layer, frozen under fullscreen and the screensaver
+test/hardware/trial-idle.sh install .         # route the real idle cycle through a checkout (undo with undo)
+```
 
 ## License
 
