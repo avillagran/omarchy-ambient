@@ -1,6 +1,7 @@
-// Preloaded into a program so its first window becomes a live background: a
-// layer surface on the bottom layer, stretched over one output, behind every
-// window and never taking keyboard focus.
+// Preloaded into a program so its first window becomes live content: a layer
+// surface stretched over one output, either behind every window and never
+// taking keyboard focus (a background), or over everything with the keyboard
+// to itself (a screensaver).
 //
 // It builds on gtk4-layer-shell's preload (vendor/gtk4-layer-shell) and adds
 // what a background needs that the stock preload lacks:
@@ -8,11 +9,19 @@
 //   OMARCHY_BG_LIVE_OUTPUT     name of the output to cover (eDP-1, DP-2, ...);
 //                              unset means the compositor's choice
 //   OMARCHY_BG_LIVE_NAMESPACE  layer namespace, omarchy-bg-live by default
-//   OMARCHY_BG_LIVE_LAYER      bottom (default) or background
+//   OMARCHY_BG_LIVE_LAYER      bottom (default), background, top or overlay
+//   OMARCHY_BG_LIVE_KEYBOARD   none (default), exclusive or on_demand
 //
 // SDL 3 also exports every toplevel it creates through xdg-foreign, which a
 // layer surface cannot be, and the compositor then drops the connection. The
 // export is answered with a stub here so SDL programs (emulators, games) run.
+//
+// Programs like SDL and mpv also inhibit idle while they show something. Live
+// content must not keep the screen awake, hold off the screensaver or the
+// lock, so idle inhibitors are answered with a stub as well. So is text input:
+// SDL enables it whenever it gets the keyboard, which wakes the input method,
+// and Hyprland takes the input method's reply for user activity. That ended a
+// screensaver each time a program in it took the keyboard.
 //
 // The output handed to the compositor must be one the program bound itself:
 // the compositor names it in wl_surface.enter, and a program like mpv crashes
@@ -174,6 +183,21 @@ static const char* env_or(const char* name, const char* fallback) {
     return value && *value ? value : fallback;
 }
 
+static enum zwlr_layer_shell_v1_layer layer_from_env(void) {
+    const char* layer = env_or("OMARCHY_BG_LIVE_LAYER", "bottom");
+    if (strcmp(layer, "background") == 0) return ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND;
+    if (strcmp(layer, "top") == 0) return ZWLR_LAYER_SHELL_V1_LAYER_TOP;
+    if (strcmp(layer, "overlay") == 0) return ZWLR_LAYER_SHELL_V1_LAYER_OVERLAY;
+    return ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM;
+}
+
+static enum zwlr_layer_surface_v1_keyboard_interactivity keyboard_from_env(void) {
+    const char* keyboard = env_or("OMARCHY_BG_LIVE_KEYBOARD", "none");
+    if (strcmp(keyboard, "exclusive") == 0) return ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_EXCLUSIVE;
+    if (strcmp(keyboard, "on_demand") == 0) return ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_ON_DEMAND;
+    return ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE;
+}
+
 static struct geom_size_t no_preferred_size(struct layer_surface_t* surface) {
     (void)surface;
     return (struct geom_size_t){0};
@@ -191,12 +215,10 @@ static struct layer_surface_t* make_background(struct wl_surface* wl_surface) {
     *self = layer_surface_make();
     self->get_preferred_size = no_preferred_size;
     layer_surface_set_name_space(self, env_or("OMARCHY_BG_LIVE_NAMESPACE", "omarchy-bg-live"));
-    layer_surface_set_layer(self, strcmp(env_or("OMARCHY_BG_LIVE_LAYER", "bottom"), "background") == 0
-                                      ? ZWLR_LAYER_SHELL_V1_LAYER_BACKGROUND
-                                      : ZWLR_LAYER_SHELL_V1_LAYER_BOTTOM);
+    layer_surface_set_layer(self, layer_from_env());
     layer_surface_set_anchor(self, (struct geom_edges_t){.left = true, .right = true, .top = true, .bottom = true});
     layer_surface_set_exclusive_zone(self, -1);
-    layer_surface_set_keyboard_mode(self, ZWLR_LAYER_SURFACE_V1_KEYBOARD_INTERACTIVITY_NONE);
+    layer_surface_set_keyboard_mode(self, keyboard_from_env());
 
     const char* output = getenv("OMARCHY_BG_LIVE_OUTPUT");
     if (output && *output) {
@@ -206,8 +228,10 @@ static struct layer_surface_t* make_background(struct wl_surface* wl_surface) {
 }
 
 // zxdg_exporter_v2.export_toplevel: hand back a stub zxdg_exported_v2 that
-// never gets a handle, as a compositor without xdg-foreign would.
-static bool stub_export(void* data, struct wl_proxy* proxy, uint32_t opcode, const struct wl_interface* created_interface,
+// never gets a handle, as a compositor without xdg-foreign would. The same
+// stub answers zwp_idle_inhibit_manager_v1.create_inhibitor and
+// zwp_text_input_manager_v3.get_text_input, so neither reaches the compositor.
+static bool stub_object(void* data, struct wl_proxy* proxy, uint32_t opcode, const struct wl_interface* created_interface,
                         uint32_t created_version, uint32_t flags, union wl_argument* args, struct wl_proxy** ret_proxy) {
     (void)data, (void)opcode, (void)flags, (void)args;
     *ret_proxy = libwayland_shim_create_client_proxy(proxy, created_interface, created_version, NULL, NULL, NULL);
@@ -218,9 +242,17 @@ static bool stub_export(void* data, struct wl_proxy* proxy, uint32_t opcode, con
 // than that.
 static const struct wl_interface zxdg_exporter_v2_interface = {.name = "zxdg_exporter_v2"};
 #define ZXDG_EXPORTER_V2_EXPORT_TOPLEVEL 1
+static const struct wl_interface zwp_idle_inhibit_manager_v1_interface = {.name = "zwp_idle_inhibit_manager_v1"};
+#define ZWP_IDLE_INHIBIT_MANAGER_V1_CREATE_INHIBITOR 1
+static const struct wl_interface zwp_text_input_manager_v3_interface = {.name = "zwp_text_input_manager_v3"};
+#define ZWP_TEXT_INPUT_MANAGER_V3_GET_TEXT_INPUT 1
 
 __attribute__((constructor)) static void setup(void) {
     layer_surface_install_hook(make_background);
-    libwayland_shim_install_request_hook(&zxdg_exporter_v2_interface, ZXDG_EXPORTER_V2_EXPORT_TOPLEVEL, stub_export, NULL);
+    libwayland_shim_install_request_hook(&zxdg_exporter_v2_interface, ZXDG_EXPORTER_V2_EXPORT_TOPLEVEL, stub_object, NULL);
+    libwayland_shim_install_request_hook(&zwp_idle_inhibit_manager_v1_interface,
+                                         ZWP_IDLE_INHIBIT_MANAGER_V1_CREATE_INHIBITOR, stub_object, NULL);
+    libwayland_shim_install_request_hook(&zwp_text_input_manager_v3_interface, ZWP_TEXT_INPUT_MANAGER_V3_GET_TEXT_INPUT,
+                                         stub_object, NULL);
     libwayland_shim_install_request_hook(&wl_registry_interface, WL_REGISTRY_BIND, record_output_bind, NULL);
 }

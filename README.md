@@ -1,13 +1,16 @@
 # omarchy-bg-live
 
-Live backgrounds for [Omarchy](https://omarchy.org): programs that draw behind
-your windows instead of a still image or a video.
+Live backgrounds and screensavers for [Omarchy](https://omarchy.org): programs
+that draw behind your windows instead of a still image or a video, or over
+everything once you step away.
 
 It comes with two:
 
-- **Screensaver**: the Omarchy screensaver's ttfx effects, on every monitor.
+- **Terminal Effects**: the Omarchy screensaver's ttfx effects in a terminal, on
+  every monitor.
 - **Amiga Demos**: classic demoscene productions running in FS-UAE. The demos
-  are downloaded the first time you choose them.
+  are downloaded the first time you choose them. As a screensaver it goes
+  through all of them, muted.
 
 Anyone can add more: a terminal program, an emulator, a shader, a game. See
 [Creating a live background](docs/creating-sources.md).
@@ -38,7 +41,40 @@ omarchy-bg-live status                  # what is running, or "none"
 omarchy-bg-live stop
 ```
 
-In Omarchy, the sources appear under **Style › Background**.
+### In Omarchy's menus
+
+Omarchy releases that know about omarchy-bg-live list the sources under
+**Appearance › Live Background** and **Appearance › Branding › Screensaver**
+by themselves. On the others, one command adds the same rows to your menu
+extension and routes the idle screensaver through omarchy-bg-live:
+
+```sh
+omarchy-bg-live omarchy install     # menu rows, and the idle service routed
+omarchy-bg-live omarchy status      # menu=yes|no|native idle=yes|no|native
+omarchy-bg-live omarchy uninstall   # Omarchy's own menu and idle service back
+```
+
+The rows go between two marked lines in
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`, and nothing else in that
+file changes. The idle service is cloned into
+`~/.config/omarchy/plugins/omarchy-bg-live.idle`, because Omarchy's idle
+service runs its own screensaver launcher by a path no user file can
+override. Run `install` again after adding a source, so it gets a row.
+
+### As the screensaver
+
+```sh
+omarchy-bg-live screensaver --set amiga   # use it at the idle timeout
+omarchy-bg-live screensaver               # run it now; any activity ends it
+omarchy-bg-live screensaver --get         # the selected one, or "text"
+omarchy-bg-live screensaver --set text    # back to Omarchy's own
+```
+
+A screensaver covers every monitor with the keyboard to itself and the cursor
+hidden, ends on the first mouse motion, click, scroll or key, and gives way to
+the lock screen. Omarchy's launcher has to hand over to it; see
+[docs/omarchy](docs/omarchy/README.md). The design is in
+[docs/screensaver-mode.md](docs/screensaver-mode.md).
 
 ## Install
 
@@ -47,6 +83,7 @@ Building needs a C compiler, `wayland-scanner` and `wayland-protocols`:
 ```sh
 make
 make install PREFIX=~/.local
+omarchy-bg-live omarchy install
 ```
 
 At run time it needs `bash`, `jq`, `socat`, `inotifywait` (inotify-tools) and
@@ -57,6 +94,17 @@ first time it starts.
 
 ```sh
 make test
+```
+
+`test/hardware` checks it all on a real Hyprland session, with nobody at the
+keyboard (a virtual pointer and `wtype` stand in for the user). They draw on
+the screen, so run them where nobody is working:
+
+```sh
+make -C test/hardware
+test/hardware/screensaver-check.sh amiga 20   # every input ends it, nothing reaches the window under it, 20 cycles
+test/hardware/background-check.sh amiga       # bottom layer, frozen under fullscreen and the screensaver
+test/hardware/trial-idle.sh install .         # route the real idle cycle through a checkout (undo with undo)
 ```
 
 ## License

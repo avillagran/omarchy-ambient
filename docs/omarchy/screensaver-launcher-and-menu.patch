@@ -1,0 +1,86 @@
+diff --git i/bin/omarchy-launch-screensaver w/bin/omarchy-launch-screensaver
+index 197b313..34e04f7 100755
+--- i/bin/omarchy-launch-screensaver
++++ w/bin/omarchy-launch-screensaver
+@@ -3,23 +3,23 @@
+ # omarchy:summary=Launch the selected Omarchy screensaver
+ # omarchy:args=[force] [default]
+ 
+-# Exit early if either screensaver backend is already running. The Amiga
+-# controller's flock is the authority; its wrapper execs into Python.
++# Exit early if the screensaver is already running. A live screensaver keeps
++# its own lock, so a second omarchy-bg-live call exits at once too.
+ pgrep -f '[o]rg.omarchy.screensaver' && exit 0
+-amiga_lock="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/omarchy-amiga-screensaver.lock"
+-if [[ -f $amiga_lock ]] && ! flock -n "$amiga_lock" true; then
+-  exit 0
+-fi
+ 
+ # Allow screensaver to be turned off but also force started
+ if omarchy-toggle-enabled screensaver-off && [[ $1 != "force" ]]; then
+   exit 1
+ fi
+ 
+-# Amiga owns its child session and input guard; the idle path never installs.
+-if [[ ${2:-} != "text" && ${2:-} != "default" ]] && omarchy-setup-screensaver --is-amiga; then
++# A live screensaver (Amiga demos, ttfx effects, ...) comes from omarchy-bg-live.
++# It draws its own layers on every monitor, hides the cursor, ends on the first
++# activity or when the session locks, and never installs anything on the idle
++# path: choosing it in the menu prepared it already.
++if [[ ${2:-} != "text" && ${2:-} != "default" ]] && omarchy-cmd-present omarchy-bg-live &&
++  [[ $(omarchy-bg-live screensaver --get 2>/dev/null) != text ]]; then
+   omarchy-shell -q shell hide omarchy.menu || true
+-  exec omarchy-screensaver-amiga
++  exec omarchy-bg-live screensaver
+ fi
+ 
+ focused=$(omarchy-hyprland-monitor-focused)
+diff --git i/default/omarchy/omarchy-menu.jsonc w/default/omarchy/omarchy-menu.jsonc
+index 6df70c3..4f34e63 100644
+--- i/default/omarchy/omarchy-menu.jsonc
++++ w/default/omarchy/omarchy-menu.jsonc
+@@ -165,13 +165,12 @@
+   "style.font.cjk.tc": {"icon":"","label":"Taiwan","checked":"[[ $(omarchy-font-cjk) == tc ]]","action":"omarchy-font-cjk tc"},
+   "style.font.cjk.hk": {"icon":"","label":"Hong Kong","checked":"[[ $(omarchy-font-cjk) == hk ]]","action":"omarchy-font-cjk hk"},
+   "style.hyprland": {"icon":"","label":"Hyprland","action":"omarchy-launch-config-editor \"$HOME/.config/hypr/looknfeel.lua\""},
+-  "style.screensaver": {"parent":"style.background","icon":"󱄄","label":"Screensaver"},
++  "style.screensaver": {"parent":"style.background","icon":"󱄄","label":"Screensaver","provider":"screensaver-sources"},
+   "style.about": {"icon":"","label":"About"},
+   "style.about.text": {"icon":"","label":"Edit Text","action":"omarchy-branding-about text"},
+   "style.about.image": {"icon":"","label":"Set From Image","action":"omarchy-branding-about image"},
+   "style.about.default": {"icon":"","label":"Restore Default","action":"omarchy-branding-about reset"},
+-  "style.screensaver.omarchy": {"icon":"󱄄","label":"Default","checked":"omarchy-setup-screensaver --is-default","action":"omarchy-setup-screensaver default"},
+-  "style.screensaver.amiga": {"parent":"style.background","icon":"󰊗","label":"Amiga Demos","checked":"omarchy-setup-screensaver --is-amiga","action":"omarchy-setup-screensaver amiga"},
++  "style.screensaver.omarchy": {"icon":"󱄄","label":"Default","checked":"[[ $(omarchy-bg-live screensaver --get 2>/dev/null || echo text) == text ]]","action":"omarchy-bg-live screensaver --set text"},
+   "style.screensaver.preview": {"icon":"","label":"Preview","action":"omarchy-launch-screensaver force"},
+   "style.screensaver.text": {"icon":"","label":"Edit Text","action":"omarchy-branding-screensaver text"},
+   "style.screensaver.image": {"icon":"","label":"Set From Image","action":"omarchy-branding-screensaver image"},
+diff --git i/shell/plugins/menu/Menu.qml w/shell/plugins/menu/Menu.qml
+index 349368a..460c23c 100644
+--- i/shell/plugins/menu/Menu.qml
++++ w/shell/plugins/menu/Menu.qml
+@@ -340,6 +340,15 @@ Item {
+     // Rows carry a fourth field (the English name) so searching "danish"
+     // finds the row labeled with its native name; mergeProviderRows turns
+     // it into an alias.
++    // Live screensavers come from omarchy-bg-live: every source that lists
++    // screensaver in its placements, the selected one marked. Choosing one
++    // prepares it (installs, downloads) before it is selected.
++    "screensaver-sources": {
++      script: "command -v omarchy-bg-live >/dev/null && omarchy-bg-live list screensaver 2>/dev/null",
++      icon: "\udb84\udd04",
++      volatile: true,
++      actionFor: function(value) { return "omarchy-bg-live screensaver --set " + Util.shellQuote(value) }
++    },
+     "languages": {
+       script: "current=$(omarchy-language 2>/dev/null); omarchy-language list 2>/dev/null | while IFS=$'\\t' read -r name code english; do [[ -z $code ]] && continue; printf '%s\\t%s\\t%s\\t%s\\n' \"$name\" \"$code\" \"$current\" \"$english\"; done",
+       icon: "\uf1ab",
+@@ -443,7 +452,7 @@ Item {
+         id: rowId,
+         parent: menuId,
+         kind: "action",
+-        icon: (value === current) ? "✓" : (spec.icon || ""),
++        icon: (value === current) ? "✓" : (parts[4] || spec.icon || ""),
+         label: label,
+         title: "",
+         target: "",

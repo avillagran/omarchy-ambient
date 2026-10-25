@@ -8,7 +8,8 @@ it whenever nobody can see it.
 Each live background comes from a **source**: a directory with a
 `source.conf` and an executable called `run`. Put your own in
 `~/.config/omarchy/bg-live/sources/<id>/` and it shows up in
-**Style › Background**, next to the bundled ones.
+**Style › Background**, next to the bundled ones. A source can also be a
+screensaver; see [Screensavers](#screensavers).
 
 ## Your first source in two minutes
 
@@ -67,6 +68,8 @@ Plain `key=value` lines; `#` starts a comment.
 | `pause` | `stop` | `stop`: freeze the program with SIGSTOP while it can't be seen. `none`: never freeze it |
 | `on_battery` | `pause` | `pause`: treat running on battery as unseen. `run`: keep going on battery |
 | `needs` | | Commands the source needs, separated by spaces. `kitty\|ghostty` means either one will do |
+| `placements` | `background` | Where it can run: `background`, `screensaver`, or both separated by a space |
+| `input` | `dismiss` | As a screensaver. `dismiss`: any activity ends it. `own`: the source takes input itself and ends the screensaver by exiting 0 |
 | `packages` | | Packages that provide them. When a need is missing, starting the source offers to install these |
 
 Every other key is a setting of your own. It reaches `prepare`, `pick` and
@@ -95,6 +98,9 @@ environment:
 | `OMARCHY_BG_LIVE_DATA` | A directory that persists: `~/.local/share/omarchy-bg-live/<id>`. Downloads go here |
 | `OMARCHY_BG_LIVE_RUNTIME` | A directory for this run only, removed when it ends |
 | `OMARCHY_BG_LIVE_NAMESPACE` | A layer namespace to use: `omarchy-bg-live-<id>` |
+| `OMARCHY_BG_LIVE_PLACEMENT` | `background` or `screensaver` |
+| `OMARCHY_BG_LIVE_LAYER` | The layer to draw on: `bottom`, or `overlay` as a screensaver |
+| `OMARCHY_BG_LIVE_KEYBOARD` | `none`, or `exclusive` as a screensaver |
 | `OMARCHY_BG_LIVE_SETTING_*` | Your settings |
 
 `prepare` and `pick` get the same variables, except the output and runtime
@@ -154,6 +160,34 @@ doesn't. Some programs still won't cooperate. This is what has been tried:
 gtk4-layer-shell, or any wlr-layer-shell binding, using
 `OMARCHY_BG_LIVE_OUTPUT` and the `bottom` layer.
 
+## Screensavers
+
+Add `screensaver` to `placements` and the source shows up in
+**Style › Screensaver** too. When the idle timeout comes,
+`omarchy-bg-live screensaver` runs it over everything on every monitor (with
+`outputs=each`), with the keyboard to itself and the cursor hidden. The first
+mouse motion, click, scroll or key ends it, and so does the session locking.
+A live background is frozen meanwhile.
+
+`run` is the same program; it reads `OMARCHY_BG_LIVE_PLACEMENT` to tell. It
+must cover the whole output with an opaque surface, on
+`OMARCHY_BG_LIVE_LAYER` and with `OMARCHY_BG_LIVE_KEYBOARD`.
+`omarchy-bg-live layer` does that already. A program that makes its own
+layer surface follows them itself, and should not bind text input
+(`zwp_text_input_v3`): Hyprland takes the input method's reply to it for user
+activity, which ends the screensaver.
+
+A screensaver may change what it shows at any time, even restart its program
+for the next demo: dismissal does not depend on its surface. To avoid
+showing the desktop in between, start the next program before ending the
+last one, as [`sources/amiga/run`](../sources/amiga/run) does.
+
+```sh
+omarchy-bg-live screensaver --set matrix   # choose it (installs and prepares it)
+omarchy-bg-live screensaver matrix         # preview it now
+omarchy-bg-live screensaver --set text     # back to Omarchy's own
+```
+
 ## Trying it out
 
 ```sh
@@ -178,5 +212,8 @@ ending, per output.
   (btop) as the background.
 - [`examples/mandelbrot`](../examples/mandelbrot): a graphical program (mpv)
   as the background, with a setting for its resolution.
+- [`examples/c64`](../examples/c64): a Commodore 64 program of your own in
+  VICE, as the background or the screensaver. Untested sketch: the VICE
+  package isn't on the test machines yet.
 
 Copy any of them into `~/.config/omarchy/bg-live/sources/` to start your own.

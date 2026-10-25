@@ -8,8 +8,8 @@ scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 
 export HOME=$scratch/home XDG_CONFIG_HOME=$scratch/home/.config XDG_DATA_HOME=$scratch/home/.local/share
-export OMARCHY_BG_LIVE_POWER_SUPPLIES=$scratch/power
-mkdir -p "$HOME/.local/state/omarchy/current" "$scratch/stubs" "$scratch/power/AC"
+export OMARCHY_BG_LIVE_POWER_SUPPLIES=$scratch/power XDG_RUNTIME_DIR=$scratch/run
+mkdir -p "$HOME/.local/state/omarchy/current" "$scratch/stubs" "$scratch/power/AC" "$XDG_RUNTIME_DIR"
 echo Mains >"$scratch/power/AC/type"
 echo 1 >"$scratch/power/AC/online"
 export PATH="$scratch/stubs:$PATH"
@@ -19,11 +19,13 @@ stub() {
   chmod +x "$scratch/stubs/$1"
 }
 
-# hyprctl answers from monitors.json and workspaces.json in the scratch dir.
+# hyprctl answers from monitors.json and workspaces.json in the scratch dir,
+# and logs anything else it is asked to hyprctl.log.
 stub hyprctl '
 case "$*" in
   *--batch*) cat "'"$scratch"'/monitors.json" "'"$scratch"'/workspaces.json" ;;
   *monitors*) cat "'"$scratch"'/monitors.json" ;;
+  *) echo "$*" >>"'"$scratch"'/hyprctl.log" ;;
 esac'
 
 monitors() { echo "$1" >"$scratch/monitors.json"; }
