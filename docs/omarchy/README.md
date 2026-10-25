@@ -9,6 +9,10 @@ The draft pull request [omacom/omarchy#16587](https://github.com/omacom/omarchy/
 ([patch](omarchy-pr-16587.patch)) makes Omarchy offer omarchy-ambient by
 itself when it is installed, and changes nothing when it isn't:
 
+- **Install › Style › Ambient** runs `omarchy-install-ambient`, which
+  installs the `omarchy-ambient` package (`packaging/arch/PKGBUILD`), and
+  **Remove › Ambient** runs `omarchy-remove-ambient`, which removes it with
+  its settings and downloads.
 - **Appearance › Live Background** lists the background sources through a
   `background-sources` provider (`omarchy-ambient list background`), plus
   None. Picking one runs `omarchy-ambient start <id>`.
