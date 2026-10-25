@@ -6,7 +6,8 @@ everything once you step away.
 
 It comes with two:
 
-- **Screensaver**: the Omarchy screensaver's ttfx effects, on every monitor.
+- **Terminal Effects**: the Omarchy screensaver's ttfx effects in a terminal, on
+  every monitor.
 - **Amiga Demos**: classic demoscene productions running in FS-UAE. The demos
   are downloaded the first time you choose them. As a screensaver it goes
   through all of them, muted.

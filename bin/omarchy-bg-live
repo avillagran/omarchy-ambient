@@ -614,7 +614,7 @@ menu_rows() {
       "[[ \$($self screensaver --get) == $id ]]" "$self screensaver --set $id"
   done < <(source_ids)
   if ! native_launcher; then
-    row "$screensaver.live-preview" "Preview" "" "" "" "$LAUNCHER force"
+    row "$screensaver.live-preview" "Preview" "" "" "" "$LAUNCHER force"
     row "system.screensaver" "Screensaver" "󱄄" "" "" "$LAUNCHER force"
   fi
 }
