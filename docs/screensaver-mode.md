@@ -137,9 +137,9 @@ does not override it, and nothing may be installed under `/usr`.
   `idle-cycle-cancel: activity` and no lock follows, and when the lock
   timeout comes with the screensaver up, the lock takes over and the
   screensaver ends about two seconds later.
-- The proposed change to the Omarchy fork is
-  [`docs/omarchy/screensaver-launcher-and-menu.patch`](omarchy/screensaver-launcher-and-menu.patch),
-  explained in [`docs/omarchy/README.md`](omarchy/README.md).
+- The change to Omarchy is the draft pull request omacom/omarchy#16587, and
+  `omarchy-bg-live omarchy install` does the same from user files on releases
+  without it; both are explained in [`docs/omarchy/README.md`](omarchy/README.md).
 - Menu: Style › Screensaver lists the stock text screensaver plus every
   source with `screensaver` in `placements`, and a Preview entry.
 
