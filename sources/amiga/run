@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Plays a demo in FS-UAE from the saved state the pack ships, so it starts on
+# its first effect instead of the boot screens. Without a choice, each output
+# gets a random demo.
+
+demos=$OMARCHY_BG_LIVE_DATA/demos
+demo=$1
+
+if [[ ! -r $demos/$demo/config.json ]]; then
+  demo=$(find "$demos" -mindepth 2 -maxdepth 2 -name config.json -printf '%h\n' | shuf -n 1)
+  demo=${demo##*/}
+fi
+
+config="$demos/$demo/$(jq -r '.variants[0].config' "$demos/$demo/config.json")"
+cp "${config%/*}"/state/*.uss "$OMARCHY_BG_LIVE_RUNTIME/Saved State 1.uss"
+
+SDL_VIDEODRIVER=wayland exec omarchy-bg-live layer fs-uae "$config" \
+  --state-dir="$OMARCHY_BG_LIVE_RUNTIME" --load-state=1 --volume=0 \
+  --fullscreen=0 --borderless=1 --keep-aspect=0 \
+  --window-width="${OMARCHY_BG_LIVE_WIDTH:-1920}" --window-height="${OMARCHY_BG_LIVE_HEIGHT:-1080}" \
+  --automatic-input-grab=0 --initial-input-grab=0 --keyboard-input-grab=0

@@ -1,0 +1,420 @@
+#!/bin/bash
+
+# omarchy:summary=Run a live program (screensaver, Amiga demo, game...) as the background
+# omarchy:args=list | start <source> [choice] | stop | status | run <source> [choice] | check <source-dir> | layer <command...>
+# omarchy:examples=omarchy-bg-live start screensaver
+
+# A live background is a program drawing behind the windows instead of a still
+# or a video. Each one comes from a source: a directory with a source.conf and
+# a run executable (see docs/creating-sources.md). While one runs, OWE is
+# paused, and the program is stopped with SIGSTOP whenever nothing can see it:
+# its output is off or shows a fullscreen window, the session is locked, or
+# the computer runs on battery. Setting an ordinary background, or a theme,
+# ends it.
+
+self=$(realpath "$0")
+root=${self%/bin/*}
+
+# A checkout runs in place; an install keeps its parts under share/ and lib/.
+if [[ -d $root/sources ]]; then
+  builtin_sources=$root/sources
+  layer_lib=$root/build/omarchy-bg-live-layer.so
+else
+  builtin_sources=$root/share/omarchy-bg-live/sources
+  layer_lib=$root/lib/omarchy-bg-live/omarchy-bg-live-layer.so
+fi
+
+CONFIG_DIR=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/bg-live
+SOURCE_PATH=${OMARCHY_BG_LIVE_PATH:-$CONFIG_DIR/sources:$builtin_sources}
+DATA_DIR=${XDG_DATA_HOME:-$HOME/.local/share}/omarchy-bg-live
+STATE_DIR=$HOME/.local/state/omarchy
+LIVE_FILE=$STATE_DIR/bg-live
+POWER_SUPPLIES=${OMARCHY_BG_LIVE_POWER_SUPPLIES:-/sys/class/power_supply}
+UNIT=omarchy-bg-live
+
+# Keys the supervisor reads itself; every other key in source.conf reaches the
+# source as OMARCHY_BG_LIVE_SETTING_<KEY>.
+RESERVED_KEYS=" name icon description order outputs pause on_battery needs packages "
+
+fail() {
+  echo "$*" >&2
+  notify-send -a omarchy-bg-live "Live background" "$*" 2>/dev/null
+  exit 1
+}
+
+# The first directory on the path that has the source wins, so a user's own
+# source replaces a bundled one with the same name.
+source_dir() {
+  local dir dirs
+  IFS=: read -ra dirs <<<"$SOURCE_PATH"
+  for dir in "${dirs[@]}"; do
+    [[ -f $dir/$1/source.conf ]] && echo "$dir/$1" && return
+  done
+  return 1
+}
+
+source_ids() {
+  local dir dirs conf
+  IFS=: read -ra dirs <<<"$SOURCE_PATH"
+  for dir in "${dirs[@]}"; do
+    for conf in "$dir"/*/source.conf; do
+      [[ -f $conf ]] && basename "${conf%/source.conf}"
+    done
+  done | awk '!seen[$0]++'
+}
+
+# key=value lines from the source's source.conf, then the user's
+# ~/.config/omarchy/bg-live/<source>.conf, so a later line overrides.
+settings_lines() {
+  cat "$2/source.conf" "$CONFIG_DIR/$1.conf" 2>/dev/null |
+    sed -n 's/^[[:space:]]*\([a-z][a-z0-9_]*\)[[:space:]]*=[[:space:]]*\(.*\)$/\1=\2/p' |
+    sed 's/[[:space:]]*$//'
+}
+
+setting() {
+  local value
+  value=$(settings_lines "$1" "$2" | sed -n "s/^$3=//p" | tail -n 1)
+  echo "${value:-$4}"
+}
+
+# A need is a command, or alternatives joined by | when any one will do.
+missing_needs() {
+  local need alternative met
+  for need in $(setting "$1" "$2" needs); do
+    met=false
+    for alternative in ${need//|/ }; do
+      command -v "$alternative" >/dev/null && met=true && break
+    done
+    $met || echo "$need"
+  done
+}
+
+# What prepare, pick and run see of their source.
+export_source_env() {
+  local key value
+  export OMARCHY_BG_LIVE_SOURCE=$1 OMARCHY_BG_LIVE_SOURCE_DIR=$2
+  export OMARCHY_BG_LIVE_DATA=$DATA_DIR/$1
+  export OMARCHY_BG_LIVE_NAMESPACE=omarchy-bg-live-$1
+  export OMARCHY_BG_LIVE_LAYER_LIB=$layer_lib
+  export PATH="${self%/*}:$PATH"
+  mkdir -p "$OMARCHY_BG_LIVE_DATA"
+
+  while IFS='=' read -r key value; do
+    [[ $RESERVED_KEYS == *" $key "* ]] || export "OMARCHY_BG_LIVE_SETTING_${key^^}=$value"
+  done < <(settings_lines "$1" "$2")
+}
+
+# Installs what the source needs, prepares it (a first download, say), and
+# lets the user pick what to show. Prints the choice, or fails when cancelled.
+prepare_and_pick() {
+  local id=$1 choice=$2 dir missing packages
+
+  dir=$(source_dir "$id") || fail "There is no live background named $id"
+  missing=$(missing_needs "$id" "$dir")
+  if [[ -n $missing ]]; then
+    packages=$(setting "$id" "$dir" packages)
+    if [[ -n $packages ]] && command -v omarchy-launch-floating-terminal-with-presentation >/dev/null; then
+      omarchy-launch-floating-terminal-with-presentation \
+        "omarchy-pkg-add $packages && $(printf '%q ' "$self" start "$id" "$choice")" >/dev/null 2>&1 &
+      return 1
+    fi
+    fail "$(setting "$id" "$dir" name "$id") needs $(echo $missing)"
+  fi
+
+  export_source_env "$id" "$dir"
+  if [[ -x $dir/prepare ]]; then
+    "$dir/prepare" >&2 || fail "$(setting "$id" "$dir" name "$id") could not be prepared"
+  fi
+  if [[ -z $choice && -x $dir/pick ]]; then
+    choice=$("$dir/pick") && [[ -n $choice ]] || return 1
+  fi
+  echo "$choice"
+}
+
+on_battery() {
+  local supply mains=false
+  for supply in "$POWER_SUPPLIES"/*; do
+    [[ -r $supply/type && $(<"$supply/type") == Mains ]] || continue
+    [[ $(<"$supply/online") == 1 ]] && return 1
+    mains=true
+  done
+  $mains
+}
+
+# The outputs where a background can be seen: none while the session is
+# locked, and none that is off or shows a fullscreen window. One hyprctl call
+# answers all of it.
+visible_outputs() {
+  [[ $on_battery_mode == pause ]] && on_battery && return
+
+  hyprctl -j --batch "monitors; workspaces" | jq -rs '
+    .[0] as $monitors | .[1] as $workspaces
+    | if any($monitors[]; (.solitaryBlockedBy // []) | index("LOCK")) then empty
+      else $monitors[]
+        | select(.dpmsStatus != false)
+        | select(.activeWorkspace.id as $id | any($workspaces[]; .id == $id and .hasfullscreen) | not)
+        | .name
+      end'
+}
+
+events() {
+  socat -u "UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock" - &
+  inotifywait -m -q -e create,moved_to --format 'background>>%f' "$STATE_DIR/current" &
+
+  # Locking, monitors turning off and unplugging the charger send no event,
+  # and a program that died gets restarted on the next tick.
+  while sleep 5; do echo tick; done &
+  wait
+}
+
+# The outputs to cover: each monitor, the focused one, or a single program
+# that covers every output itself (shown as *).
+targets() {
+  case $outputs in
+    all) echo '*' ;;
+    focused) hyprctl -j monitors | jq -r 'map(select(.focused))[0].name' ;;
+    *) hyprctl -j monitors | jq -r '.[].name' ;;
+  esac
+}
+
+launch() {
+  local output=$1 width= height= scale= work
+
+  if [[ $output != '*' ]]; then
+    read -r width height scale < <(hyprctl -j monitors | jq -r --arg output "$output" '.[] | select(.name == $output) | "\(.width) \(.height) \(.scale)"')
+    [[ -n $width ]] || return
+  fi
+
+  work=$runtime/${output/\*/all}
+  mkdir -p "$work"
+
+  OMARCHY_BG_LIVE_OUTPUT=${output#\*} OMARCHY_BG_LIVE_WIDTH=$width OMARCHY_BG_LIVE_HEIGHT=$height \
+    OMARCHY_BG_LIVE_SCALE=$scale OMARCHY_BG_LIVE_RUNTIME=$work OMARCHY_BG_LIVE_CHOICE=$choice \
+    setsid "$dir/run" ${choice:+"$choice"} </dev/null &
+
+  program[$output]=$!
+  started[$output]=$SECONDS
+  paused[$output]=false
+  echo "started $id ${choice:+$choice }on $output"
+}
+
+# Each program runs as the leader of its own session; zombies don't count.
+any_alive() {
+  local pid
+  for pid in "$@"; do
+    ps -o stat= -s "$pid" 2>/dev/null | grep -qv '^Z' && return 0
+  done
+  return 1
+}
+
+# Asks the programs' process groups to end, and makes sure they did.
+end_groups() {
+  local pid i
+  for pid in "$@"; do
+    kill -CONT -- -"$pid" 2>/dev/null
+    kill -TERM -- -"$pid" 2>/dev/null
+  done
+  for ((i = 0; i < 30; i++)); do
+    any_alive "$@" || return 0
+    sleep 0.1
+  done
+  for pid in "$@"; do
+    kill -KILL -- -"$pid" 2>/dev/null
+  done
+}
+
+finish() {
+  [[ -n ${program[$1]} ]] || return
+  end_groups "${program[$1]}"
+  unset "program[$1]" "started[$1]" "paused[$1]" "failures[$1]"
+  rm -rf "${runtime:?}/${1/\*/all}"
+  echo "ended on $1"
+}
+
+# A program that keeps dying right after it starts is given up on.
+restart() {
+  local output=$1
+  end_groups "${program[$output]}"
+
+  if ((SECONDS - started[$output] < 10)); then
+    failures[$output]=$((${failures[$output]:-0} + 1))
+  else
+    failures[$output]=0
+  fi
+
+  if ((failures[$output] >= 5)); then
+    unset "program[$output]"
+    echo "gave up on $output"
+    ((${#program[@]} > 0)) || exit 1
+  else
+    echo "restarting on $output"
+    launch "$output"
+  fi
+}
+
+evaluate() {
+  local output visible pid
+
+  for output in "${!program[@]}"; do
+    pid=${program[$output]}
+    [[ $(ps -o stat= -p "$pid" 2>/dev/null) == [^Z]* ]] || restart "$output"
+  done
+
+  [[ $pause == stop ]] || return
+  visible=" $(visible_outputs | tr '\n' ' ') "
+
+  for output in "${!program[@]}"; do
+    pid=${program[$output]}
+    if [[ $visible == *" $output "* || ($output == '*' && $visible != "  ") ]]; then
+      ${paused[$output]} && kill -CONT -- -"$pid" && paused[$output]=false && echo "resumed on $output"
+    else
+      ${paused[$output]} || { kill -STOP -- -"$pid" && paused[$output]=true && echo "paused on $output"; }
+    fi
+  done
+}
+
+cleanup() {
+  ((${#program[@]} > 0)) && end_groups "${program[@]}"
+  [[ -n $listener ]] && kill -- -"$listener" 2>/dev/null
+  $owe_paused && owe resume >/dev/null
+  rm -rf "$runtime"
+  rm -f "$LIVE_FILE"
+  echo stopped
+}
+
+supervise() {
+  id=$1 choice=$2 owe_paused=false listener=
+  declare -gA program=() started=() paused=() failures=()
+
+  dir=$(source_dir "$id") || exit 1
+  outputs=$(setting "$id" "$dir" outputs each)
+  pause=$(setting "$id" "$dir" pause stop)
+  on_battery_mode=$(setting "$id" "$dir" on_battery pause)
+  export_source_env "$id" "$dir"
+  runtime=$(mktemp -d -t omarchy-bg-live.XXXXXX)
+
+  # Leave OWE alone if the user paused it; it is theirs to resume.
+  if command -v owe >/dev/null && [[ $(owe status 2>/dev/null | jq -r '.manual_pause') != true ]] &&
+    owe pause >/dev/null 2>&1; then
+    owe_paused=true
+  fi
+
+  exec 3< <(exec setsid bash -c "$(declare -f events); STATE_DIR=$(printf %q "$STATE_DIR"); events")
+  listener=$!
+
+  trap cleanup EXIT
+  trap 'exit 0' TERM INT
+  mkdir -p "$STATE_DIR"
+  printf '%s %s\n' "$id" "$choice" >"$LIVE_FILE"
+
+  local output
+  while read -r output; do
+    launch "$output"
+  done < <(targets)
+  ((${#program[@]} > 0)) || exit 1
+  evaluate
+
+  local event
+  while read -r event <&3; do
+    case $event in
+      background\>\>background) exit 0 ;;
+      monitoradded\>\>*) [[ $outputs == each ]] && launch "${event#*>>}" ;;
+      monitorremoved\>\>*) finish "${event#*>>}" ;;
+      fullscreen\>\>* | workspace\>\>* | focusedmon\>\>* | activespecial\>\>* | tick) ;;
+      *) continue ;;
+    esac
+    evaluate
+  done
+}
+
+list() {
+  local id dir current
+  current=$(status_id)
+  while read -r id; do
+    dir=$(source_dir "$id")
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$(setting "$id" "$dir" order 50)" \
+      "$(setting "$id" "$dir" name "$id")" "$id" "$current" \
+      "$(setting "$id" "$dir" description)" "$(setting "$id" "$dir" icon)"
+  done < <(source_ids) | sort -t $'\t' -k1,1n -k2,2 | cut -f2-
+}
+
+status_id() {
+  local id
+  systemctl --user -q is-active "$UNIT" && read -r id _ <"$LIVE_FILE" && echo "$id"
+}
+
+check() {
+  local dir=${1%/} id problems=() value file
+  id=$(basename "$dir")
+
+  [[ $id =~ ^[a-z0-9][a-z0-9-]*$ ]] || problems+=("the directory name, $id, should be lowercase letters, digits and dashes")
+  if [[ -f $dir/source.conf ]]; then
+    [[ -n $(setting "$id" "$dir" name) ]] || problems+=("source.conf has no name")
+    value=$(setting "$id" "$dir" outputs each)
+    [[ $value =~ ^(each|focused|all)$ ]] || problems+=("outputs is $value, not each, focused or all")
+    value=$(setting "$id" "$dir" pause stop)
+    [[ $value =~ ^(stop|none)$ ]] || problems+=("pause is $value, not stop or none")
+    value=$(setting "$id" "$dir" on_battery pause)
+    [[ $value =~ ^(pause|run)$ ]] || problems+=("on_battery is $value, not pause or run")
+    value=$(missing_needs "$id" "$dir")
+    [[ -z $value ]] || problems+=("this computer lacks $(echo $value)")
+  else
+    problems+=("there is no source.conf")
+  fi
+  [[ -x $dir/run ]] || problems+=("run is missing or not executable")
+  for file in pick prepare; do
+    [[ ! -e $dir/$file || -x $dir/$file ]] || problems+=("$file is not executable")
+  done
+
+  if ((${#problems[@]} > 0)); then
+    printf '%s\n' "${problems[@]/#/$id: }" >&2
+    return 1
+  fi
+  echo "$id: ok"
+}
+
+case $1 in
+  list)
+    list
+    ;;
+  start)
+    [[ -n $2 ]] || { echo "Usage: omarchy-bg-live start <source> [choice]" >&2; exit 1; }
+    choice=$(prepare_and_pick "$2" "$3") || exit 0
+    systemctl --user stop "$UNIT" 2>/dev/null
+    systemd-run --user --quiet --collect --unit="$UNIT" -p KillMode=mixed -p TimeoutStopSec=10 \
+      -E PATH="$PATH" -E WAYLAND_DISPLAY -E HYPRLAND_INSTANCE_SIGNATURE -E OMARCHY_PATH -E OMARCHY_BG_LIVE_PATH \
+      "$self" supervise "$2" "$choice"
+    ;;
+  run)
+    [[ -n $2 ]] || { echo "Usage: omarchy-bg-live run <source> [choice]" >&2; exit 1; }
+    choice=$(prepare_and_pick "$2" "$3") || exit 0
+    systemctl --user stop "$UNIT" 2>/dev/null
+    supervise "$2" "$choice"
+    ;;
+  stop)
+    systemctl --user stop "$UNIT" 2>/dev/null
+    ;;
+  status)
+    if systemctl --user -q is-active "$UNIT" && [[ -f $LIVE_FILE ]]; then
+      cat "$LIVE_FILE"
+    else
+      echo none
+    fi
+    ;;
+  check)
+    [[ -n $2 ]] || { echo "Usage: omarchy-bg-live check <source-dir>" >&2; exit 1; }
+    check "$2"
+    ;;
+  layer)
+    shift
+    [[ -r $layer_lib ]] || { echo "The layer library is not built; run make in $root" >&2; exit 1; }
+    LD_PRELOAD="$layer_lib${LD_PRELOAD:+:$LD_PRELOAD}" exec "$@"
+    ;;
+  supervise)
+    supervise "$2" "$3"
+    ;;
+  *)
+    echo "Usage: omarchy-bg-live list | start <source> [choice] | stop | status | run <source> [choice] | check <source-dir> | layer <command...>" >&2
+    exit 1
+    ;;
+esac

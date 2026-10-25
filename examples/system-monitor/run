@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Kitty's panel kitten draws a terminal on a layer of its own, on the output
+# the supervisor names.
+exec kitty +kitten panel --edge=center --layer=bottom --focus-policy=not-allowed \
+  --output-name="$OMARCHY_BG_LIVE_OUTPUT" --class="$OMARCHY_BG_LIVE_NAMESPACE" \
+  -o background_opacity=0.85 btop

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+# Offers each demo by its preview and title, and prints the chosen demo's id.
+
+demos=$OMARCHY_BG_LIVE_DATA/demos
+previews=$OMARCHY_BG_LIVE_DATA/previews
+config= title= selected=
+
+rm -rf "$previews"
+mkdir -p "$previews"
+for config in "$demos"/*/config.json; do
+  title=$(jq -r '.title' "$config")
+  [[ -r ${config%/*}/preview.png ]] && ln -s "${config%/*}/preview.png" "$previews/${title//\//-}.png"
+done
+
+selected=$(omarchy-menu-images --show-labels "$previews")
+[[ -n $selected ]] && basename "$(dirname "$(readlink -f "$selected")")"

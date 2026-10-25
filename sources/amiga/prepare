@@ -1,0 +1,27 @@
+#!/bin/bash
+
+# Downloads the demo pack once, checks it against the pinned checksum, and
+# unpacks it into this source's data directory.
+
+demos=$OMARCHY_BG_LIVE_DATA/demos
+compgen -G "$demos/*/config.json" >/dev/null && exit 0
+
+notify-send -a omarchy-bg-live "Amiga Demos" "Downloading the demos (${OMARCHY_BG_LIVE_SETTING_PACK_SIZE:-a few MB})…"
+
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+if ! curl -fsSL --retry 2 -o "$work/pack.zip" "$OMARCHY_BG_LIVE_SETTING_PACK_URL"; then
+  echo "Could not download $OMARCHY_BG_LIVE_SETTING_PACK_URL" >&2
+  exit 1
+fi
+
+if ! echo "$OMARCHY_BG_LIVE_SETTING_PACK_SHA256  $work/pack.zip" | sha256sum --check --quiet --status; then
+  echo "The downloaded demo pack does not match its checksum" >&2
+  exit 1
+fi
+
+mkdir -p "$work/demos"
+bsdtar -xf "$work/pack.zip" -C "$work/demos" --strip-components 1 || exit 1
+rm -rf "$demos"
+mv "$work/demos" "$demos"
