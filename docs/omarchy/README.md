@@ -5,35 +5,16 @@ the idle screensaver.
 
 ## Natively: omacom/omarchy#16587
 
-The draft pull request [omacom/omarchy#16587](https://github.com/omacom/omarchy/pull/16587)
-([patch](omarchy-pr-16587.patch)) makes Omarchy offer omarchy-ambient by
-itself when it is installed, and changes nothing when it isn't:
+The draft pull request [omacom/omarchy#16587](https://github.com/omacom/omarchy/pull/16587) ([patch](omarchy-pr-16587.patch)) integrates the engine as an internal dependency, delivered with Omarchy's default packages and updates. The runtime package must be published to Omarchy's package repository before the integration merges. Users do not install an Ambient add-on.
 
-- **Install › Style › Ambient** runs `omarchy-install-ambient`, which
-  installs the `omarchy-ambient` package (`packaging/arch/PKGBUILD`), and
-  **Remove › Ambient** runs `omarchy-remove-ambient`, which removes it with
-  its settings and downloads.
-- **Appearance › Live Background** lists the background sources through a
-  `background-sources` provider (`omarchy-ambient list background`), plus
-  None. Picking one runs `omarchy-ambient start <id>`.
-- **Appearance › Branding › Screensaver** lists the screensaver sources
-  through a `screensaver-sources` provider, next to Text Effects (the stock
-  screensaver) and Preview. Picking one runs
-  `omarchy-ambient screensaver --set <id>`.
-- `omarchy-launch-screensaver` hands over to `omarchy-ambient screensaver`
-  when a live screensaver is chosen; `force text` still forces the stock one.
+- **Style > Background** has **Theme**, **Screensaver**, and **Amiga Demos**. Current quattro names the parent **Appearance**, with `style` as its existing alias. Theme opens the normal picker and stops the live background, including when the same image is selected again. The other two entries start their respective engine sources.
+- **Screensaver** preserves **Set Animated Text**, **Set From Image**, **Set Amiga Demos**, **Preview**, and **Restore Default**, in that order. The selected Amiga source is checked. Successful text/image/reset operations return to the stock text screensaver before previewing; cancelling preserves the selection.
+- `omarchy-launch-screensaver` delegates live sources to the engine, with activity dismissal, cursor restoration, single-instance locking and session-lock handling. The stock text path remains available.
+- The update migration adds the runtime and rendering dependencies, then removes only the previous compatibility menu rows and idle clone. Settings and demos remain in place.
 
-Provider rows are `name, id, current id, description, icon`, tab-separated:
-the shape `omarchy-ambient list` prints.
+There is no separate Live Background submenu or Ambient Install/Remove entry. The native menus use fixed product choices; the engine's source interface remains extensible internally.
 
-The idle service needs no change. It keys the end of the screensaver on
-windows of class `org.omarchy.screensaver`, which a layer doesn't have, but it
-cancels the cycle on any activity once its three-second launch grace is over,
-and the activity that dismisses the screensaver is exactly that.
-
-It was tried on a 2015 MacBook Pro with Omarchy 4.0.6 by running the shell
-from the branch: both menus, choosing with the keyboard, Preview, and the
-real idle timeout starting the Amiga screensaver through the new launcher.
+The corrected menus and keyboard-driven Amiga Preview were checked on mbp-intel with the branch shell. Keyboard activity dismissed the preview; the installed shell, previous selection and stay-awake setting were restored afterwards.
 
 ## Today: `omarchy-ambient install`
 

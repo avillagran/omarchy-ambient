@@ -128,6 +128,12 @@ assert "a native menu gets no rows" bash -c "! grep -q 'omarchy-ambient' '$exten
 assert "a native launcher needs no clone" test ! -e "$plugin"
 assert_eq "status says Omarchy does both" "$("$AMBIENT" installed)" "menu=native idle=native"
 
+# The native menu has fixed product choices, not a list of every engine source.
+sed -i 's/"provider":"screensaver-sources"/"action":"omarchy-ambient screensaver --set amiga"/' "$OMARCHY_PATH/default/omarchy/omarchy-menu.jsonc"
+"$AMBIENT" install >"$scratch/out" 2>&1
+assert "a fixed native menu gets no compatibility rows" bash -c "! grep -q 'omarchy-ambient' '$extension'"
+assert_eq "fixed native integration is recognized" "$("$AMBIENT" installed)" "menu=native idle=native"
+
 # Someone else's clone of the idle service is left alone.
 fake_omarchy style
 mkdir -p "$XDG_CONFIG_HOME/omarchy/plugins/amiga.idle"

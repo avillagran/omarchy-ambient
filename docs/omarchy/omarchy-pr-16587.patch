@@ -1,61 +1,43 @@
-From 9241ad7d6607924da792eb3bd2f5253a8e095b29 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Andr=C3=A9s=20Villagr=C3=A1n?= <andres@villagranquiroz.cl>
-Date: Sun, 25 Oct 2026 19:10:52 -0300
-Subject: [PATCH] Offer live backgrounds and screensavers from omarchy-ambient
-
-Install > Style > Ambient installs the omarchy-ambient package, and
-Remove > Ambient removes it with its settings and downloads. Once it is
-installed, Appearance gets a Live Background menu listing its background
-sources, and Branding > Screensaver lists its screensaver sources next to
-the stock Text Effects, with a Preview. The screensaver launcher hands over
-to omarchy-ambient when a live screensaver is chosen. Nothing changes
-without omarchy-ambient.
----
- bin/omarchy-install-ambient           | 13 +++++++
- bin/omarchy-launch-screensaver        |  9 +++++
- bin/omarchy-remove-ambient            | 16 ++++++++
- default/i18n/en/menu.json             | 18 +++++++++
- default/omarchy/omarchy-menu.jsonc    |  8 +++-
- shell/plugins/menu/Menu.qml           | 18 ++++++++-
- test/shell.d/menu-test.sh             | 26 ++++++++++++-
- test/shell.d/screensaver-live-test.sh | 53 +++++++++++++++++++++++++++
- 8 files changed, 158 insertions(+), 3 deletions(-)
- create mode 100755 bin/omarchy-install-ambient
- create mode 100755 bin/omarchy-remove-ambient
- create mode 100755 test/shell.d/screensaver-live-test.sh
-
-diff --git a/bin/omarchy-install-ambient b/bin/omarchy-install-ambient
-new file mode 100755
-index 000000000..aed159e11
---- /dev/null
-+++ b/bin/omarchy-install-ambient
-@@ -0,0 +1,13 @@
-+#!/bin/bash
-+
-+# omarchy:summary=Install omarchy-ambient, for live backgrounds and live screensavers
-+# omarchy:requires-sudo=true
-+
-+set -euo pipefail
-+
-+echo "Installing Ambient..."
-+omarchy-pkg-add omarchy-ambient
-+
-+echo ""
-+echo "Ambient has been installed. Pick a live background under Appearance > Live Background,"
-+echo "and a live screensaver under Appearance > Branding > Screensaver."
+diff --git a/bin/omarchy-branding-screensaver b/bin/omarchy-branding-screensaver
+index 814344194..6a357c734 100755
+--- a/bin/omarchy-branding-screensaver
++++ b/bin/omarchy-branding-screensaver
+@@ -12,14 +12,20 @@ case "${1:-}" in
+ image)
+   image=$(omarchy-file-select --title "$(omarchy-i18n branding.pickScreensaverImage)" --extensions "png svg")
+   if omarchy-transcode-ascii "$image" ~/.config/omarchy/branding/screensaver.txt; then
++    omarchy-ambient screensaver --set text
+     omarchy-launch-screensaver force >/dev/null 2>&1
+   fi
+   ;;
+ text)
+-  omarchy-launch-editor ~/.config/omarchy/branding/screensaver.txt >/dev/null 2>&1 && omarchy-launch-screensaver force >/dev/null 2>&1
++  if omarchy-launch-editor ~/.config/omarchy/branding/screensaver.txt >/dev/null 2>&1; then
++    omarchy-ambient screensaver --set text
++    omarchy-launch-screensaver force >/dev/null 2>&1
++  fi
+   ;;
+ reset)
+-  cp "$OMARCHY_PATH/logo.txt" ~/.config/omarchy/branding/screensaver.txt && omarchy-launch-screensaver force >/dev/null 2>&1
++  cp "$OMARCHY_PATH/logo.txt" ~/.config/omarchy/branding/screensaver.txt
++  omarchy-ambient screensaver --set text
++  omarchy-launch-screensaver force >/dev/null 2>&1
+   ;;
+ *)
+   echo "Usage: omarchy-branding-screensaver <image|text|reset>" >&2
 diff --git a/bin/omarchy-launch-screensaver b/bin/omarchy-launch-screensaver
-index 3db5acfe9..7e49b98cd 100755
+index 3db5acfe9..e13dc286c 100755
 --- a/bin/omarchy-launch-screensaver
 +++ b/bin/omarchy-launch-screensaver
 @@ -10,6 +10,15 @@ if omarchy-toggle-enabled screensaver-off && [[ $1 != "force" ]]; then
    exit 1
  fi
  
-+# A live screensaver chosen under Appearance > Branding > Screensaver comes from
++# The selected Amiga screensaver comes from
 +# omarchy-ambient. It draws its own layers on every monitor, hides the cursor,
 +# ends on the first activity or when the session locks, and keeps one running
 +# at a time. "text" forces the stock one.
-+if [[ ${2:-} != "text" ]] && omarchy-cmd-present omarchy-ambient &&
++if [[ ${2:-} != "text" ]] &&
 +  [[ $(omarchy-ambient screensaver --get 2>/dev/null) != "text" ]]; then
 +  exec omarchy-ambient screensaver
 +fi
@@ -63,218 +45,165 @@ index 3db5acfe9..7e49b98cd 100755
  focused=$(omarchy-hyprland-monitor-focused)
  terminal=$(xdg-terminal-exec --print-id)
  
-diff --git a/bin/omarchy-remove-ambient b/bin/omarchy-remove-ambient
-new file mode 100755
-index 000000000..04386b35b
---- /dev/null
-+++ b/bin/omarchy-remove-ambient
-@@ -0,0 +1,16 @@
-+#!/bin/bash
+diff --git a/bin/omarchy-theme-bg-set b/bin/omarchy-theme-bg-set
+index 34100c2f6..e0aff947b 100755
+--- a/bin/omarchy-theme-bg-set
++++ b/bin/omarchy-theme-bg-set
+@@ -17,6 +17,9 @@ if [[ ! -f $BACKGROUND ]]; then
+   exit 1
+ fi
+ 
++# Return to the theme even when the same background is selected again.
++omarchy-ambient stop
 +
-+# omarchy:summary=Remove omarchy-ambient along with its settings and downloads, going back to the stock background and screensaver
-+# omarchy:requires-sudo=true
-+
-+set -e
-+
-+omarchy-ambient stop 2>/dev/null || true
-+omarchy-pkg-drop omarchy-ambient
-+
-+rm -rf \
-+  "$HOME/.config/omarchy/ambient" \
-+  "$HOME/.local/share/omarchy-ambient"
-+
-+echo ""
-+echo "Ambient has been removed."
+ # Create symlink to the new background media
+ ln -nsf "$BACKGROUND" "$CURRENT_BACKGROUND_LINK"
+ 
 diff --git a/default/i18n/en/menu.json b/default/i18n/en/menu.json
-index bafed0445..df62034b0 100644
+index bafed0445..bebd42169 100644
 --- a/default/i18n/en/menu.json
 +++ b/default/i18n/en/menu.json
-@@ -86,6 +86,12 @@
+@@ -86,6 +86,15 @@
    "appearance.background": {
      "label": "Background"
    },
-+  "appearance.live-background": {
-+    "label": "Live Background"
++  "appearance.background.theme": {
++    "label": "Theme"
 +  },
-+  "appearance.live-background.none": {
-+    "label": "None"
++  "appearance.background.screensaver": {
++    "label": "Screensaver"
++  },
++  "appearance.background.amiga": {
++    "label": "Amiga Demos"
 +  },
    "appearance.font": {
      "label": "Font"
    },
-@@ -245,6 +251,12 @@
+@@ -237,14 +246,20 @@
+     "label": "Restore Default"
+   },
+   "appearance.branding.screensaver.text": {
+-    "label": "Edit Text"
++    "label": "Set Animated Text"
+   },
+   "appearance.branding.screensaver.image": {
+     "label": "Set From Image"
+   },
++  "appearance.branding.screensaver.amiga": {
++    "label": "Set Amiga Demos"
++  },
    "appearance.branding.screensaver.default": {
      "label": "Restore Default"
    },
 +  "appearance.branding.screensaver.preview": {
 +    "label": "Preview"
 +  },
-+  "appearance.branding.screensaver.text-effects": {
-+    "label": "Text Effects"
-+  },
    "appearance.dock": {
      "label": "Dock"
    },
-@@ -731,6 +743,9 @@
-   "install.style.background": {
-     "label": "Background"
-   },
-+  "install.style.ambient": {
-+    "label": "Ambient"
-+  },
-   "install.style.font": {
-     "label": "Font"
-   },
-@@ -1004,6 +1019,9 @@
-   "remove.theme": {
-     "label": "Theme"
-   },
-+  "remove.ambient": {
-+    "label": "Ambient"
-+  },
-   "remove.gaming": {
-     "label": "Gaming",
-     "title": "Remove"
 diff --git a/default/omarchy/omarchy-menu.jsonc b/default/omarchy/omarchy-menu.jsonc
-index da07a04ff..65ccb596c 100644
+index da07a04ff..f7680c09c 100644
 --- a/default/omarchy/omarchy-menu.jsonc
 +++ b/default/omarchy/omarchy-menu.jsonc
-@@ -55,6 +55,8 @@
+@@ -54,7 +54,10 @@
+ 
    // Appearance
    "appearance.theme": {"icon":"󰸌","label":"Theme","aliases":["theme","themes"],"action":"omarchy-shell shell summon omarchy.image-picker '{\"source\":\"themes\"}'"},
-   "appearance.background": {"icon":"","label":"Background","aliases":["background","wallpaper"],"action":"background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\""},
-+  "appearance.live-background": {"icon":"󰸉","label":"Live Background","aliases":["live-background"],"when":"omarchy-cmd-present omarchy-ambient","provider":"background-sources"},
-+  "appearance.live-background.none": {"icon":"󰅖","label":"None","checked":"[[ $(omarchy-ambient status) == none ]]","action":"omarchy-ambient stop"},
+-  "appearance.background": {"icon":"","label":"Background","aliases":["background","wallpaper"],"action":"background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\""},
++  "appearance.background": {"icon":"","label":"Background","aliases":["background","wallpaper"]},
++  "appearance.background.theme": {"icon":"","label":"Theme","checked":"[[ $(omarchy-ambient status) == none ]]","action":"background=$(omarchy-theme-bg-switcher); [[ -n $background ]] && omarchy-theme-bg-set \"$background\""},
++  "appearance.background.screensaver": {"icon":"󱄄","label":"Screensaver","checked":"[[ $(omarchy-ambient status | cut -d ' ' -f 1) == screensaver ]]","action":"omarchy-ambient start screensaver"},
++  "appearance.background.amiga": {"icon":"󰊗","label":"Amiga Demos","checked":"[[ $(omarchy-ambient status | cut -d ' ' -f 1) == amiga ]]","action":"omarchy-ambient start amiga"},
    "appearance.font": {"icon":"","label":"Font","provider":"fonts"},
    "appearance.top-bar": {"icon":"󰍜","label":"Menu Bar"},
    "appearance.top-bar.hide": {"icon":"󰈉","label":"Hide Bar","when":"! omarchy-toggle-enabled bar-off","action":"omarchy-toggle-bar"},
-@@ -100,7 +102,7 @@
-   "appearance.windows.one-window-ratio-on": {"icon":"","label":"1-Window Ratio On","when":"! omarchy-hyprland-toggle-enabled single-window-aspect-ratio","action":"omarchy-hyprland-window-single-square-aspect-toggle"},
-   "appearance.windows.one-window-ratio-off": {"icon":"","label":"1-Window Ratio Off","when":"omarchy-hyprland-toggle-enabled single-window-aspect-ratio","action":"omarchy-hyprland-window-single-square-aspect-toggle"},
-   "appearance.branding": {"icon":"","iconFont":"omarchy","label":"Branding"},
--  "appearance.branding.screensaver": {"icon":"󱄄","label":"Screensaver"},
-+  "appearance.branding.screensaver": {"icon":"󱄄","label":"Screensaver","provider":"screensaver-sources"},
-   "appearance.branding.about": {"icon":"","label":"About"},
+@@ -105,8 +108,10 @@
    "appearance.branding.about.text": {"icon":"","label":"Edit Text","action":"omarchy-branding-about text"},
    "appearance.branding.about.image": {"icon":"","label":"Set From Image","action":"omarchy-branding-about image"},
-@@ -108,6 +110,8 @@
-   "appearance.branding.screensaver.text": {"icon":"","label":"Edit Text","action":"omarchy-branding-screensaver text"},
+   "appearance.branding.about.default": {"icon":"","label":"Restore Default","action":"omarchy-branding-about reset"},
+-  "appearance.branding.screensaver.text": {"icon":"","label":"Edit Text","action":"omarchy-branding-screensaver text"},
++  "appearance.branding.screensaver.text": {"icon":"󱄄","label":"Set Animated Text","action":"omarchy-branding-screensaver text"},
    "appearance.branding.screensaver.image": {"icon":"","label":"Set From Image","action":"omarchy-branding-screensaver image"},
-   "appearance.branding.screensaver.default": {"icon":"","label":"Restore Default","action":"omarchy-branding-screensaver reset"},
++  "appearance.branding.screensaver.amiga": {"icon":"󰊗","label":"Set Amiga Demos","checked":"[[ $(omarchy-ambient screensaver --get) == amiga ]]","action":"omarchy-ambient screensaver --set amiga"},
 +  "appearance.branding.screensaver.preview": {"icon":"","label":"Preview","action":"omarchy-launch-screensaver force"},
-+  "appearance.branding.screensaver.text-effects": {"icon":"󱄄","label":"Text Effects","when":"omarchy-cmd-present omarchy-ambient","checked":"[[ $(omarchy-ambient screensaver --get) == text ]]","action":"omarchy-ambient screensaver --set text"},
+   "appearance.branding.screensaver.default": {"icon":"","label":"Restore Default","action":"omarchy-branding-screensaver reset"},
    "appearance.dock": {"icon":"󱂩","label":"Dock","when":"[[ $(omarchy-hyprland-workspace-layout-current) == \"floating\" ]]"},
    "appearance.dock.autohide": {"icon":"󰈉","label":"Auto-hide Dock","when":"[[ $(omarchy-dock autohide) == \"off\" ]]","action":"omarchy-dock autohide on"},
-   "appearance.dock.always-on": {"icon":"󰈈","label":"Always-on Dock","when":"[[ $(omarchy-dock autohide) == \"on\" ]]","action":"omarchy-dock autohide off"},
-@@ -274,6 +278,7 @@
-   "install.style": {"icon":"","label":"Style"},
-   "install.style.theme": {"icon":"󰸌","label":"Theme","action":"omarchy-launch-floating-terminal-with-presentation omarchy-theme-install"},
-   "install.style.background": {"icon":"","label":"Background","action":"omarchy-theme-bg-install"},
-+  "install.style.ambient": {"icon":"󰸉","label":"Ambient","disabled":"omarchy-pkg-present omarchy-ambient","action":"omarchy-launch-floating-terminal-with-presentation omarchy-install-ambient"},
-   "install.style.font": {"icon":"","label":"Font"},
-   "install.style.font.cascadia": {"icon":"","label":"Cascadia Mono","action":"omarchy-install-font 'Cascadia Mono' ttf-cascadia-mono-nerd 'CaskaydiaMono Nerd Font'"},
-   "install.style.font.meslo": {"icon":"","label":"Meslo LG Mono","action":"omarchy-install-font 'Meslo LG Mono' ttf-meslo-nerd 'MesloLGL Nerd Font'"},
-@@ -366,6 +371,7 @@
-   "remove.service": {"icon":"","label":"Services","title":"Remove"},
-   "remove.development": {"icon":"󰵮","label":"Development","title":"Remove"},
-   "remove.theme": {"icon":"󰸌","label":"Theme","action":"omarchy-theme-remove"},
-+  "remove.ambient": {"icon":"󰸉","label":"Ambient","when":"omarchy-pkg-present omarchy-ambient","action":"omarchy-launch-floating-terminal-with-presentation omarchy-remove-ambient"},
-   "remove.gaming": {"icon":"","label":"Gaming","title":"Remove"},
-   "remove.browser": {"icon":"","label":"Browser","title":"Remove"},
-   "remove.webapp": {"icon":"","label":"Web App","when":"grep -qE '^Exec=.*(omarchy-launch-webapp|omarchy-webapp-handler)' $HOME/.local/share/applications/*.desktop","action":"omarchy-webapp-remove"},
-diff --git a/shell/plugins/menu/Menu.qml b/shell/plugins/menu/Menu.qml
-index 7189cce03..cf2f10b04 100644
---- a/shell/plugins/menu/Menu.qml
-+++ b/shell/plugins/menu/Menu.qml
-@@ -321,6 +321,22 @@ Item {
-   // re-runs every time its submenu is entered, so a font installed since the
-   // shell started shows up without restarting it.
-   readonly property var providers: ({
-+    // Live backgrounds and screensavers come from omarchy-ambient, so a
-+    // source the user adds shows up next to the bundled ones. Rows carry a
-+    // description to search by, and their own icon. Choosing a screensaver
-+    // installs and prepares it, so the idle timeout never has to.
-+    "background-sources": {
-+      script: "command -v omarchy-ambient >/dev/null && omarchy-ambient list background 2>/dev/null",
-+      icon: "\udb83\ude09",
-+      volatile: true,
-+      actionFor: function(value) { return "omarchy-ambient start " + Util.shellQuote(value) }
-+    },
-+    "screensaver-sources": {
-+      script: "command -v omarchy-ambient >/dev/null && omarchy-ambient list screensaver 2>/dev/null",
-+      icon: "\udb84\udd04",
-+      volatile: true,
-+      actionFor: function(value) { return "omarchy-ambient screensaver --set " + Util.shellQuote(value) }
-+    },
-     "fonts": {
-       script: "current=$(omarchy-font-current 2>/dev/null); omarchy-font-list 2>/dev/null | while read -r f; do [[ -z $f ]] && continue; printf '%s\\t%s\\t%s\\n' \"$f\" \"$f\" \"$current\"; done",
-       icon: "",
-@@ -453,7 +469,7 @@ Item {
-         id: rowId,
-         parent: menuId,
-         kind: "action",
--        icon: (value === current) ? "✓" : (spec.icon || ""),
-+        icon: (value === current) ? "✓" : (parts[4] || spec.icon || ""),
-         label: label,
-         title: "",
-         target: "",
+diff --git a/install/omarchy-base.packages b/install/omarchy-base.packages
+index bd2dde726..8b9f4a327 100644
+--- a/install/omarchy-base.packages
++++ b/install/omarchy-base.packages
+@@ -45,6 +45,7 @@ ffmpeg
+ ffmpegthumbnailer
+ fontconfig
+ foot
++fs-uae
+ fzf
+ git
+ gliff
+@@ -68,6 +69,7 @@ imv
+ inetutils
+ inotify-tools
+ inxi
++kitty
+ networkmanager
+ jq
+ kernel-modules-hook
+@@ -99,6 +101,7 @@ obsidian
+ omacalc
+ omacut
+ omawrite
++omarchy-ambient
+ omarchy-nvim
+ omarchy-hyprland-titlebars
+ # Stock power-profiles-daemon has no cppc_cpufreq driver, so profiles do nothing
+diff --git a/migrations/1792966252.sh b/migrations/1792966252.sh
+new file mode 100644
+index 000000000..1b6c1bed9
+--- /dev/null
++++ b/migrations/1792966252.sh
+@@ -0,0 +1,5 @@
++echo "Add the native live background and screensaver runtime"
++omarchy-pkg-add omarchy-ambient fs-uae kitty
++
++# Retire only the compatibility menu rows and idle clone; keep selections and demos.
++omarchy-ambient remove
 diff --git a/test/shell.d/menu-test.sh b/test/shell.d/menu-test.sh
-index 1179a2666..05e0271fd 100644
+index 1179a2666..24fa38330 100644
 --- a/test/shell.d/menu-test.sh
 +++ b/test/shell.d/menu-test.sh
-@@ -385,6 +385,7 @@ assertDeepEqual(
-     'remove.service',
-     'remove.development',
-     'remove.theme',
-+    'remove.ambient',
-     'remove.gaming',
-     'remove.browser',
-     'remove.webapp',
-@@ -581,7 +582,7 @@ const appearanceLabels = ['Animations On', 'Animations Off', 'Menu Bar', 'Dock',
- assertEqual(triggerIds[0], 'trigger.toggle', 'menu lists Toggle first under Trigger')
- assertDeepEqual(
-   defaultItems.filter(item => item.parent === 'appearance').map(item => item.label),
--  ['Theme', 'Background', 'Font', 'Menu Bar', 'Windows', 'Branding', 'Dock', 'Workspace Layout', 'Animations On', 'Animations Off', 'Unlock'],
-+  ['Theme', 'Background', 'Live Background', 'Font', 'Menu Bar', 'Windows', 'Branding', 'Dock', 'Workspace Layout', 'Animations On', 'Animations Off', 'Unlock'],
-   'menu gathers the style and look of the desktop under Appearance'
- )
- assertDeepEqual(
-@@ -681,6 +682,29 @@ assert(
+@@ -681,6 +681,25 @@ assert(
    /"fonts": \{[\s\S]*?volatile: true/.test(providerBlock),
    'menu re-enumerates the font list every time it is opened'
  )
-+// Live backgrounds and screensavers are omarchy-ambient sources: the rows
-+// list whatever it has installed, and picking one hands it the source id.
-+for (const [key, list, action] of [
-+  ['background-sources', 'omarchy-ambient list background', 'omarchy-ambient start '],
-+  ['screensaver-sources', 'omarchy-ambient list screensaver', 'omarchy-ambient screensaver --set ']
-+]) {
-+  const block = (providerBlock.match(new RegExp(`"${key}": \\{[\\s\\S]*?\\n    \\}`)) || [''])[0]
-+  assert(block.includes(`command -v omarchy-ambient >/dev/null && ${list}`) && /volatile: true/.test(block) && block.includes(`"${action}" + Util.shellQuote(value)`),
-+    `menu lists ${key} from omarchy-ambient and hands it the picked id`)
-+}
-+assert(defaultById['appearance.live-background'].provider === 'background-sources'
-+    && defaultById['appearance.live-background'].when === 'omarchy-cmd-present omarchy-ambient',
-+  'Live Background only shows with omarchy-ambient installed')
-+assert(defaultById['appearance.branding.screensaver'].provider === 'screensaver-sources'
-+    && defaultById['appearance.branding.screensaver.text-effects'].action === 'omarchy-ambient screensaver --set text',
-+  'Screensaver lists the live screensavers next to the stock text effects')
-+assert(defaultById['install.style.ambient'].action.endsWith(' omarchy-install-ambient')
-+    && defaultById['install.style.ambient'].disabled === 'omarchy-pkg-present omarchy-ambient'
-+    && defaultById['remove.ambient'].action.endsWith(' omarchy-remove-ambient')
-+    && defaultById['remove.ambient'].when === 'omarchy-pkg-present omarchy-ambient',
-+  'omarchy-ambient installs from Install > Style and removes from Remove')
-+assert(/icon: \(value === current\) \? "✓" : \(parts\[4\] \|\| spec\.icon \|\| ""\)/.test(menuQml),
-+  'a provider row can carry its own icon')
++// Native choices preserve the approved names, order and selection behavior.
++assertDeepEqual(defaultItems.filter(item => item.parent === 'appearance.background').map(item => item.label),
++  ['Theme', 'Screensaver', 'Amiga Demos'], 'Background offers the three native choices')
++assert(defaultById['appearance.background'].kind === 'menu'
++    && !defaultById['appearance.background'].action, 'Background opens a submenu')
++assert(defaultById['appearance.background.screensaver'].action === 'omarchy-ambient start screensaver'
++    && defaultById['appearance.background.amiga'].action === 'omarchy-ambient start amiga',
++  'live background choices start the intended source')
++assertDeepEqual(defaultItems.filter(item => item.parent === 'appearance.branding.screensaver').map(item => item.label),
++  ['Set Animated Text', 'Set From Image', 'Set Amiga Demos', 'Preview', 'Restore Default'],
++  'Screensaver preserves the approved actions and order')
++assert(defaultById['appearance.branding.screensaver.amiga'].action === 'omarchy-ambient screensaver --set amiga'
++    && defaultById['appearance.branding.screensaver.amiga'].checked.includes('== amiga'),
++  'the selected Amiga screensaver is marked')
++assert(!defaultById['install.style.ambient'] && !defaultById['remove.ambient']
++    && !defaultById['appearance.live-background'], 'Ambient has no separate install or background menu')
++assert(defaultItems.filter(item => item.parent === 'appearance.background'
++    || item.parent === 'appearance.branding.screensaver').every(item => !item.when),
++  'native choices are always available')
  assert(
    /function setActiveMenu\([\s\S]*?root\.invalidateVolatileProvider\(id\)\s*\n\s*root\.loadProviderForMenu\(id\)/.test(menuQml)
      && /function openExistingMenu\([\s\S]*?invalidateVolatileProvider\(activeMenu\)\s*\n\s*loadProviderForMenu\(activeMenu\)/.test(menuQml),
 diff --git a/test/shell.d/screensaver-live-test.sh b/test/shell.d/screensaver-live-test.sh
 new file mode 100755
-index 000000000..e16354a81
+index 000000000..4b0d98897
 --- /dev/null
 +++ b/test/shell.d/screensaver-live-test.sh
-@@ -0,0 +1,53 @@
+@@ -0,0 +1,85 @@
 +#!/bin/bash
 +
 +# The launcher hands the screensaver to omarchy-ambient when a live one is
@@ -325,9 +254,38 @@ index 000000000..e16354a81
 +[[ $(launch) == "stock" ]] || fail "with Text Effects chosen the stock screensaver runs" "$(launch)"
 +pass "with Text Effects chosen the stock screensaver runs"
 +
-+rm "$tmpdir/bin/omarchy-ambient"
-+[[ $(launch) == "stock" ]] || fail "without omarchy-ambient the stock screensaver runs" "$(launch)"
-+pass "without omarchy-ambient the stock screensaver runs"
--- 
-2.56.0
-
++# Branding changes must switch back from Amiga only after the edit succeeds.
++mkdir -p "$tmpdir/home/.config/omarchy/branding" "$tmpdir/omarchy"
++printf 'logo\n' >"$tmpdir/omarchy/logo.txt"
++printf '#!/bin/bash\necho preview >>"$TEST_DIR/calls"\n' >"$tmpdir/bin/omarchy-launch-screensaver"
++printf '#!/bin/bash\nexit "${EDIT_RESULT:-0}"\n' >"$tmpdir/bin/omarchy-launch-editor"
++printf '#!/bin/bash\necho image.png\n' >"$tmpdir/bin/omarchy-file-select"
++printf '#!/bin/bash\nexit "${EDIT_RESULT:-0}"\n' >"$tmpdir/bin/omarchy-transcode-ascii"
++printf '#!/bin/bash\necho pick-image\n' >"$tmpdir/bin/omarchy-i18n"
++chmod +x "$tmpdir/bin/"*
++brand() {
++  : >"$tmpdir/calls"
++  env HOME="$tmpdir/home" OMARCHY_PATH="$tmpdir/omarchy" TEST_DIR="$tmpdir" EDIT_RESULT="${2:-0}" \
++    PATH="$tmpdir/bin:$ROOT/bin:/usr/bin:/bin" bash "$ROOT/bin/omarchy-branding-screensaver" "$1" || true
++  cat "$tmpdir/calls"
++}
++for mode in text image reset; do
++  [[ $(brand "$mode") == $'ambient screensaver --set text\npreview' ]] || fail "$mode selects text before preview" "$(brand "$mode")"
++  pass "$mode selects text before preview"
++done
++for mode in text image; do
++  [[ -z $(brand "$mode" 1) ]] || fail "cancelled $mode preserves the screensaver selection" "$(brand "$mode" 1)"
++  pass "cancelled $mode preserves the screensaver selection"
++done
++# Picking even the already-selected theme image must end a live background.
++mkdir -p "$tmpdir/home/.local/state/omarchy/current"
++printf image >"$tmpdir/theme.png"
++printf '#!/bin/bash\necho theme >>"$TEST_DIR/calls"\n' >"$tmpdir/bin/omarchy-shell"
++chmod +x "$tmpdir/bin/omarchy-shell"
++: >"$tmpdir/calls"
++for repeat in 1 2; do
++  env HOME="$tmpdir/home" TEST_DIR="$tmpdir" PATH="$tmpdir/bin:$ROOT/bin:/usr/bin:/bin" \
++    bash "$ROOT/bin/omarchy-theme-bg-set" "$tmpdir/theme.png"
++done
++[[ $(cat "$tmpdir/calls") == $'ambient stop\ntheme\nambient stop\ntheme' ]] || fail "theme selection stops the live background every time" "$(cat "$tmpdir/calls")"
++pass "theme selection stops the live background every time"

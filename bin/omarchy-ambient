@@ -580,7 +580,7 @@ menu_has() {
 }
 
 native_menu() {
-  grep -q '"provider":"screensaver-sources"' "$(omarchy_menu)" 2>/dev/null
+  grep -Eq '"provider"[[:space:]]*:[[:space:]]*"screensaver-sources"|"action"[[:space:]]*:[[:space:]]*"omarchy-ambient screensaver --set amiga"' "$(omarchy_menu)" 2>/dev/null
 }
 
 native_launcher() {
