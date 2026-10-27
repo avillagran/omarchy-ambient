@@ -7,9 +7,20 @@ args=(
   --effects "${OMARCHY_AMBIENT_SETTING_EFFECTS:-matrix,decrypt,rings,thunderstorm}"
   --rotate "${OMARCHY_AMBIENT_SETTING_ROTATE:-30}"
   --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}"
-  --text "${OMARCHY_AMBIENT_SETTING_TEXT:-OMARCHY}"
   --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-2}"
 )
+# An explicit source override wins; otherwise share Omarchy's text/image
+# branding with the stock screensaver. Pass a path so newlines survive intact.
+if [[ -n ${OMARCHY_AMBIENT_SETTING_TEXT_FILE:-} ]]; then
+  args+=(--text-file "$OMARCHY_AMBIENT_SETTING_TEXT_FILE")
+elif [[ -n ${OMARCHY_AMBIENT_SETTING_TEXT:-} ]]; then
+  args+=(--text "$OMARCHY_AMBIENT_SETTING_TEXT")
+elif [[ -f $HOME/.config/omarchy/branding/screensaver.txt ]]; then
+  args+=(--text-file "$HOME/.config/omarchy/branding/screensaver.txt")
+else
+  args+=(--text OMARCHY)
+fi
+
 [[ ${OMARCHY_AMBIENT_SETTING_AUDIO:-0} == 1 ]] && args+=(--audio)
 
 # omarchy-ttfx-layer still reads them under the engine's former name,
