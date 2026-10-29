@@ -98,8 +98,11 @@ omarchy-ambient install
 ```
 
 At run time it needs `bash`, `jq`, `socat`, `inotifywait` (inotify-tools) and
-Hyprland. Each source lists what else it needs, and offers to install it the
-first time it starts.
+Hyprland, and the Omarchy Effects source needs
+[omarchy-ttfx-layer](https://github.com/avillagran/omarchy-ttfx-layer) on the
+PATH. Each other source lists what else it needs, and offers to install it the
+first time it starts. `packaging/arch/PKGBUILD` builds the package for x86_64
+and aarch64.
 
 ### Coming from omarchy-bg-live
 
