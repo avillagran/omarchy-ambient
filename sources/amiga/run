@@ -11,17 +11,29 @@
 
 demos=$OMARCHY_AMBIENT_DATA/demos
 
+# The demos play muted, so FS-UAE does not need the sound server. It still
+# opens a stream through OpenAL, and when the server has stopped answering,
+# that blocks the start for the Pulse protocol's thirty seconds. Offer the
+# server a short silent stream first; when it does not take it within two
+# seconds, FS-UAE runs with OpenAL's null driver and starts at once.
+sound_server_answers() {
+  command -v paplay >/dev/null || return 0
+  head -c 1600 /dev/zero |
+    timeout 2 paplay --raw --format=s16le --channels=1 --rate=8000 --volume=0 2>/dev/null
+}
+
 # play <demo> <slot>: starts FS-UAE on the demo in the background. Two slots,
 # so the next demo restores its state while the last one still shows.
 play() {
-  local config state=$OMARCHY_AMBIENT_RUNTIME/$2
+  local config state=$OMARCHY_AMBIENT_RUNTIME/$2 audio=()
   config="$demos/$1/$(jq -r '.variants[0].config' "$demos/$1/config.json")"
   mkdir -p "$state"
   cp "${config%/*}"/state/*.uss "$state/Saved State 1.uss"
+  sound_server_answers || audio=(ALSOFT_DRIVERS=null)
 
   # SDL would otherwise inhibit idle, keeping the lock screen away. FS-UAE
   # keeps its logs and caches under the source's data, not in ~/Documents.
-  SDL_VIDEODRIVER=wayland SDL_VIDEO_ALLOW_SCREENSAVER=1 omarchy-ambient layer fs-uae "$config" \
+  env SDL_VIDEODRIVER=wayland SDL_VIDEO_ALLOW_SCREENSAVER=1 "${audio[@]}" omarchy-ambient layer fs-uae "$config" \
     --base-dir="$OMARCHY_AMBIENT_DATA/fs-uae" --state-dir="$state" --load-state=1 --volume=0 \
     --fullscreen=0 --borderless=1 --keep-aspect=0 \
     --window-width="${OMARCHY_AMBIENT_WIDTH:-1920}" --window-height="${OMARCHY_AMBIENT_HEIGHT:-1080}" \
