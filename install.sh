@@ -19,7 +19,7 @@ say() { printf '%s\n' "$*"; }
 die() { printf 'omarchy-ambient: %s\n' "$*" >&2; exit 1; }
 
 uninstall() {
-  local id
+  local id conf
   if [[ -x $bindir/omarchy-ambient ]]; then
     "$bindir/omarchy-ambient" stop >/dev/null 2>&1 || true
     "$bindir/omarchy-ambient" remove >/dev/null 2>&1 || true
@@ -31,6 +31,9 @@ uninstall() {
     while read -r id; do
       [[ $id =~ ^[a-z0-9-]+$ ]] || continue
       rm -rf "${config:?}/omarchy/ambient/sources/$id" "${data:?}/omarchy-ambient/$id/bin"
+      # Ours, unless the user has since edited it.
+      conf=$config/omarchy/ambient/$id.conf
+      [[ $(cat "$conf" 2>/dev/null) == on_battery=run ]] && rm -f "$conf"
       rmdir "$data/omarchy-ambient/$id" 2>/dev/null || true
     done <"$manifest"
   fi
@@ -46,7 +49,8 @@ uninstall() {
   fi
   rm -rf "${config:?}/omarchy/plugins/$plugin_id" "$selector" "${cache:?}/omarchy/ambient-selector"
   rm -f "$bindir/omarchy-ambient-background-select"
-  say "omarchy-ambient removed. Your config files in $config/omarchy/ambient stay."
+  rmdir "$config/omarchy/ambient/sources" "$config/omarchy/ambient" 2>/dev/null || true
+  say "omarchy-ambient removed. Any config you edited in $config/omarchy/ambient stays."
 }
 
 case ${1:-} in
@@ -130,8 +134,16 @@ exec python3 "$selector/background_selector.py" "\$@"
 SCRIPT
 chmod +x "$bindir/omarchy-ambient-background-select"
 
-command -v omarchy-plugin-enable >/dev/null &&
-  { omarchy-plugin-enable "$plugin_id" >/dev/null 2>&1 || say "Enable the plugin $plugin_id by hand."; }
+# The shell only knows the plugin after a rescan, which takes a moment.
+enabled=false
+if command -v omarchy-plugin-enable >/dev/null; then
+  omarchy-shell -q shell rescanPlugins
+  for _ in {1..20}; do
+    omarchy-plugin-enable "$plugin_id" >/dev/null 2>&1 && { enabled=true; break; }
+    sleep 0.25
+  done
+fi
+$enabled || say "Enable the plugin by hand: omarchy-plugin-enable $plugin_id"
 "$bindir/omarchy-ambient" install >/dev/null 2>&1 || say "Could not add the menu rows: run omarchy-ambient install."
 
 say ""
