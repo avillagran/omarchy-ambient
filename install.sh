@@ -25,7 +25,8 @@ keep() {
   [[ -e $target || -L $target ]] || return 0
   grep -qxF "$target" "$backups/index" 2>/dev/null && return 0
   mkdir -p "$backups"
-  slot=$backups/$(($(wc -l <"$backups/index" 2>/dev/null || echo 0) + 1))
+  slot=$backups/1
+  [[ -f $backups/index ]] && slot=$backups/$(($(wc -l <"$backups/index") + 1))
   cp -a "$target" "$slot"
   printf '%s\n' "$target" >>"$backups/index"
 }
@@ -45,14 +46,18 @@ restore_kept() {
 is_ours() { [[ -f $manifest ]] && grep -qxF "$1" "$manifest"; }
 
 uninstall() {
-  local id conf active
+  local id conf active rebuild_menu=false
   [[ -f $manifest ]] || die "nothing to remove: this installer did not install it here"
   if [[ -x $bindir/omarchy-ambient ]]; then
     active=$("$bindir/omarchy-ambient" status 2>/dev/null | awk '{print $1}')
     if [[ -n $active ]] && is_ours "$active"; then
       "$bindir/omarchy-ambient" stop >/dev/null 2>&1 || true
     fi
-    [[ -e $selector/added-menu ]] && { "$bindir/omarchy-ambient" remove >/dev/null 2>&1 || true; }
+    if [[ -e $selector/added-menu ]]; then
+      "$bindir/omarchy-ambient" remove >/dev/null 2>&1 || true
+    else
+      rebuild_menu=true
+    fi
   fi
   if command -v omarchy-plugin-disable >/dev/null; then
     omarchy-plugin-disable "$plugin_id" >/dev/null 2>&1 || true
@@ -81,6 +86,10 @@ uninstall() {
   rm -f "$bindir/omarchy-ambient-background-select"
   rmdir "$config/omarchy/ambient/sources" "$config/omarchy/ambient" 2>/dev/null || true
   restore_kept
+  # The menu was already there: it must only list what is left.
+  if $rebuild_menu && [[ -x $bindir/omarchy-ambient ]]; then
+    "$bindir/omarchy-ambient" install >/dev/null 2>&1 || true
+  fi
   if [[ -d $config/omarchy/plugins/$plugin_id ]] && command -v omarchy-plugin-enable >/dev/null; then
     omarchy-plugin-enable "$plugin_id" >/dev/null 2>&1 || true
   fi
@@ -179,6 +188,8 @@ done
 rm -rf "${config:?}/omarchy/plugins/$plugin_id"
 cp -r "$b/plugin" "$config/omarchy/plugins/$plugin_id"
 chmod +x "$config/omarchy/plugins/$plugin_id/bin/list.sh"
+# A link here must be replaced, not written through to whatever it points at.
+rm -f "$bindir/omarchy-ambient-background-select"
 cat >"$bindir/omarchy-ambient-background-select" <<SCRIPT
 #!/bin/bash
 exec python3 "$selector/background_selector.py" "\$@"

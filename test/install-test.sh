@@ -74,25 +74,41 @@ plugin=$XDG_CONFIG_HOME/omarchy/plugins/avillagran.ambient-selector
 mkdir -p "$sources/demo" "$plugin/old" "$data/demo/bin" "$HOME/.local/bin" "$HOME/.cache/omarchy/ambient-selector"
 printf 'mine\n' >"$sources/demo/source.conf"
 printf 'mine\n' >"$plugin/old/Service.qml"
-printf 'mine\n' >"$HOME/.local/bin/omarchy-ambient-background-select"
+printf 'mine\n' >"$scratch/my-selector"
+ln -s "$scratch/my-selector" "$HOME/.local/bin/omarchy-ambient-background-select"
 printf 'mine\n' >"$HOME/.cache/omarchy/ambient-selector/mine.jpg"
 ln -s /somewhere/mine "$data/demo/bin/omarchy-ttfx-layer"
 printf '#!/bin/bash\necho mine\n' >"$HOME/.local/bin/omarchy-ambient"
 chmod +x "$HOME/.local/bin/omarchy-ambient"
-assert "it installs over an existing setup" bash "$install_sh"
+install_output=$(bash "$install_sh" 2>&1)
+assert "it installs over an existing setup" test -f "$data/selector/installed-sources"
 assert_eq "its source is in use" "$(cat "$sources/demo/source.conf")" "name=Demo"
 assert "and again" bash "$install_sh"
 assert "it uninstalls that too" bash "$install_sh" --uninstall
 assert_eq "the existing source is back" "$(cat "$sources/demo/source.conf")" "mine"
 assert_eq "the existing plugin is back" "$(cat "$plugin/old/Service.qml")" "mine"
-assert_eq "the existing command is back" "$(cat "$HOME/.local/bin/omarchy-ambient-background-select")" "mine"
+assert_eq "the file behind an existing command is untouched" "$(cat "$scratch/my-selector")" "mine"
+assert_eq "the existing command is back" "$(readlink "$HOME/.local/bin/omarchy-ambient-background-select")" "$scratch/my-selector"
 assert_eq "the existing poster is back" "$(cat "$HOME/.cache/omarchy/ambient-selector/mine.jpg")" "mine"
 assert_eq "the existing link is back" "$(readlink "$data/demo/bin/omarchy-ttfx-layer")" "/somewhere/mine"
 assert_eq "the existing program is back" "$("$HOME/.local/bin/omarchy-ambient")" "mine"
+assert_eq "its output has no stray errors" "$(grep -c 'No such file' <<<"$install_output")" 0
 assert "the backup is gone" test ! -e "$XDG_DATA_HOME/omarchy-ambient-backup"
 
 output=$(bash "$install_sh" --uninstall 2>&1) && status=0 || status=$?
 assert "uninstalling what it did not install stops" test "$status" -ne 0
 assert_eq "and touches nothing" "$(cat "$sources/demo/source.conf")" "mine"
+
+# Someone who already had Ambient's menu rows ends with the same menu, not stale rows.
+rm -rf "$sources/demo" "$data/demo" "$HOME/.local/bin/omarchy-ambient"
+menu=$XDG_CONFIG_HOME/omarchy/extensions/omarchy-menu.jsonc
+"$AMBIENT" install >/dev/null 2>&1
+assert_eq "the menu starts installed" "$("$AMBIENT" installed)" "menu=yes idle=yes"
+ln -s "$AMBIENT" "$HOME/.local/bin/omarchy-ambient"
+before=$(sha256sum <"$menu")
+assert "it installs beside the menu" bash "$install_sh"
+assert "its scene gets a row" grep -q 'demo' "$menu"
+assert "it uninstalls beside the menu" bash "$install_sh" --uninstall
+assert_eq "the menu is as it was" "$(sha256sum <"$menu")" "$before"
 
 finish_tests
