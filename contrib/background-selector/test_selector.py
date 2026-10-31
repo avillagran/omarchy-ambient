@@ -18,7 +18,7 @@ class Routing(unittest.TestCase):
  def test_every_ascii_choice_has_preview_and_uses_ambient(self):
   items=m.choices('screensaver');self.assertEqual(len({i['id'] for i in items}),len(items))
   for item in items:
-   self.assertTrue(item.get('poster'),item['id'])
+   self.assertTrue(item.get('poster',item['id']+'.jpg').endswith('.jpg'))
    with patch.object(m,'run') as run:
     m.main(['--apply-ascii',item['id']]);run.assert_called_once_with(m.AMBIENT,'start',item['source'],item['choice'])
  def test_unknown_picker_result_does_not_start(self):

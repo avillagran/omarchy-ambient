@@ -6,6 +6,8 @@ trap 'rm -rf "$tmpdir"' EXIT
 mkdir -p "$tmpdir/bin"
 export OMARCHY_AMBIENT_DATA="$tmpdir/data"
 export OMARCHY_AMBIENT_SETTING_BINARY="$tmpdir/bin/renderer"
+# Only the stub counts: a real renderer in ~/.local/bin must not be found.
+export PATH=/usr/bin:/bin
 # Old renderer accepts unknown flags and returns its unchanged probe marker.
 printf '#!/bin/bash\n[[ $* == *--probe* ]] || { echo unexpected-startup >&2; exit 99; }\necho "omarchy-ttfx-layer 1"\n' >"$OMARCHY_AMBIENT_SETTING_BINARY"
 chmod +x "$OMARCHY_AMBIENT_SETTING_BINARY"
