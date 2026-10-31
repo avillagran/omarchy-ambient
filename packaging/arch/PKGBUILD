@@ -1,7 +1,7 @@
 # Maintainer: Andrés Villagrán <andres@villagranquiroz.cl>
 
 pkgname=omarchy-ambient
-pkgver=0.3.0
+pkgver=0.3.1
 pkgrel=1
 pkgdesc='Live backgrounds and screensavers for Omarchy: programs drawing behind the windows or over everything'
 arch=('x86_64' 'aarch64')
