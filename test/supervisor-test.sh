@@ -28,7 +28,11 @@ exec sleep infinity"
 
 # The program covering an output, found by the environment it was given.
 program_on() {
-  grep -lzx "OMARCHY_AMBIENT_OUTPUT=$1" /proc/[0-9]*/environ 2>/dev/null | cut -d/ -f3 | head -n 1
+  # A real background on the same output must not be mistaken for this test's.
+  local env
+  for env in $(grep -lzx "OMARCHY_AMBIENT_OUTPUT=$1" /proc/[0-9]*/environ 2>/dev/null); do
+    grep -qzx "HOME=$HOME" "$env" 2>/dev/null && { cut -d/ -f3 <<<"$env"; return; }
+  done
 }
 state_of() { ps -o stat= -p "$(program_on "$1")" | cut -c1; }
 logged() { grep -qx "$1" "$scratch/log"; }

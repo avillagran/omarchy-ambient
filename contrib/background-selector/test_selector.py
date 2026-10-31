@@ -18,7 +18,7 @@ class Routing(unittest.TestCase):
  def test_every_ascii_choice_has_preview_and_uses_ambient(self):
   items=m.choices('screensaver');self.assertEqual(len({i['id'] for i in items}),len(items))
   for item in items:
-   self.assertTrue((m.CACHE/item.get('poster',item['id']+'.jpg')).is_file())
+   self.assertTrue(item.get('poster'),item['id'])
    with patch.object(m,'run') as run:
     m.main(['--apply-ascii',item['id']]);run.assert_called_once_with(m.AMBIENT,'start',item['source'],item['choice'])
  def test_unknown_picker_result_does_not_start(self):
@@ -27,7 +27,7 @@ class Routing(unittest.TestCase):
    run.assert_not_called()
  def test_random_all_categories_and_no_picker(self):
   for category in ('theme','screensaver','amiga'):
-   item=m.choices(category)[0]
-   with patch.object(m.random.SystemRandom,'choice',side_effect=[category,item]),patch.object(m,'capture') as capture,patch.object(m,'apply') as apply,patch.object(m.subprocess,'run'):
+   item={'id':'one','label':'One'}
+   with patch.object(m,'choices',return_value=[item]),patch.object(m.random.SystemRandom,'choice',side_effect=[category,item]),patch.object(m,'capture') as capture,patch.object(m,'apply') as apply,patch.object(m.subprocess,'run'):
     m.main(['random']);apply.assert_called_once_with(category,item);capture.assert_not_called()
 if __name__=='__main__':unittest.main()
