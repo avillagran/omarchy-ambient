@@ -14,15 +14,45 @@ bindir=$HOME/.local/bin
 plugin_id=avillagran.ambient-selector
 selector=$data/omarchy-ambient/selector
 manifest=$selector/installed-sources
+backups=$data/omarchy-ambient-backup
 
 say() { printf '%s\n' "$*"; }
 die() { printf 'omarchy-ambient: %s\n' "$*" >&2; exit 1; }
 
+# Move something that is not ours aside, once. Uninstalling puts it back as it was.
+keep() {
+  local target=$1 slot
+  [[ -e $target || -L $target ]] || return 0
+  grep -qxF "$target" "$backups/index" 2>/dev/null && return 0
+  mkdir -p "$backups"
+  slot=$backups/$(($(wc -l <"$backups/index" 2>/dev/null || echo 0) + 1))
+  cp -a "$target" "$slot"
+  printf '%s\n' "$target" >>"$backups/index"
+}
+
+restore_kept() {
+  local target n=0
+  [[ -f $backups/index ]] || return 0
+  while IFS= read -r target; do
+    n=$((n + 1))
+    rm -rf "$target"
+    mkdir -p "$(dirname "$target")"
+    cp -a "$backups/$n" "$target"
+  done <"$backups/index"
+  rm -rf "$backups"
+}
+
+is_ours() { [[ -f $manifest ]] && grep -qxF "$1" "$manifest"; }
+
 uninstall() {
-  local id conf
+  local id conf active
+  [[ -f $manifest ]] || die "nothing to remove: this installer did not install it here"
   if [[ -x $bindir/omarchy-ambient ]]; then
-    "$bindir/omarchy-ambient" stop >/dev/null 2>&1 || true
-    "$bindir/omarchy-ambient" remove >/dev/null 2>&1 || true
+    active=$("$bindir/omarchy-ambient" status 2>/dev/null | awk '{print $1}')
+    if [[ -n $active ]] && is_ours "$active"; then
+      "$bindir/omarchy-ambient" stop >/dev/null 2>&1 || true
+    fi
+    [[ -e $selector/added-menu ]] && { "$bindir/omarchy-ambient" remove >/dev/null 2>&1 || true; }
   fi
   if command -v omarchy-plugin-disable >/dev/null; then
     omarchy-plugin-disable "$plugin_id" >/dev/null 2>&1 || true
@@ -50,6 +80,10 @@ uninstall() {
   rm -rf "${config:?}/omarchy/plugins/$plugin_id" "$selector" "${cache:?}/omarchy/ambient-selector"
   rm -f "$bindir/omarchy-ambient-background-select"
   rmdir "$config/omarchy/ambient/sources" "$config/omarchy/ambient" 2>/dev/null || true
+  restore_kept
+  if [[ -d $config/omarchy/plugins/$plugin_id ]] && command -v omarchy-plugin-enable >/dev/null; then
+    omarchy-plugin-enable "$plugin_id" >/dev/null 2>&1 || true
+  fi
   say "omarchy-ambient removed. Any config you edited in $config/omarchy/ambient stays."
 }
 
@@ -91,6 +125,18 @@ renderer=$b/selector/omarchy-ttfx-layer
 absent=$({ ldd "$renderer" 2>/dev/null || true; } | awk '/not found/ {print $1}' | tr '\n' ' ')
 [[ -z $absent ]] || die "the renderer needs libraries this system lacks: $absent"
 
+# What the first install replaces is kept; later runs replace their own files.
+first=true
+[[ -f $manifest ]] && first=false
+if $first; then
+  keep "$bindir/omarchy-ambient"
+  keep "$bindir/omarchy-ambient-background-select"
+  keep "$HOME/.local/lib/omarchy-ambient"
+  keep "$HOME/.local/share/omarchy-ambient/sources"
+  keep "$config/omarchy/plugins/$plugin_id"
+  keep "$cache/omarchy/ambient-selector"
+fi
+
 mkdir -p "$bindir" "$selector" "$config/omarchy/ambient/sources" "$config/omarchy/plugins" \
   "$cache/omarchy/ambient-selector"
 
@@ -112,10 +158,15 @@ ln -sfn "$selector/omarchy-ttfx-layer" "$selector/ttfx-ambient-preview"
 command -v omarchy-ttfx-layer >/dev/null || ln -sfn "$selector/omarchy-ttfx-layer" "$bindir/omarchy-ttfx-layer"
 cp "$b"/posters/* "$cache/omarchy/ambient-selector/"
 
+known=$(cat "$manifest" 2>/dev/null || true)
 : >"$manifest"
 for dir in "$b"/sources/*/; do
   id=$(basename "$dir")
-  rm -rf "$config/omarchy/ambient/sources/$id"
+  if ! grep -qxF "$id" <<<"$known"; then
+    keep "$config/omarchy/ambient/sources/$id"
+    keep "$data/omarchy-ambient/$id/bin"
+  fi
+  rm -rf "$config/omarchy/ambient/sources/$id" "$data/omarchy-ambient/$id/bin"
   cp -r "$dir" "$config/omarchy/ambient/sources/$id"
   mkdir -p "$data/omarchy-ambient/$id/bin"
   ln -sfn "$selector/omarchy-ttfx-layer" "$data/omarchy-ambient/$id/bin/omarchy-ttfx-layer"
@@ -144,6 +195,9 @@ if command -v omarchy-plugin-enable >/dev/null; then
   done
 fi
 $enabled || say "Enable the plugin by hand: omarchy-plugin-enable $plugin_id"
+if $first && [[ $("$bindir/omarchy-ambient" installed 2>/dev/null) != "menu=yes idle=yes" ]]; then
+  : >"$selector/added-menu"
+fi
 "$bindir/omarchy-ambient" install >/dev/null 2>&1 || say "Could not add the menu rows: run omarchy-ambient install."
 
 say ""
