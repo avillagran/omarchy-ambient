@@ -62,6 +62,12 @@ uninstall() {
   if command -v omarchy-plugin-disable >/dev/null; then
     omarchy-plugin-disable "$plugin_id" >/dev/null 2>&1 || true
   fi
+  # A screensaver choice of ours would point at a scene that is about to go.
+  id=$(sed -n 's/^[[:space:]]*source[[:space:]]*=[[:space:]]*\([a-z0-9-]*\).*$/\1/p' \
+    "$config/omarchy/ambient/screensaver.conf" 2>/dev/null || true)
+  if [[ -n $id ]] && is_ours "$id"; then
+    rm -f "$config/omarchy/ambient/screensaver.conf"
+  fi
   if [[ -f $manifest ]]; then
     while read -r id; do
       [[ $id =~ ^[a-z0-9-]+$ ]] || continue
@@ -144,6 +150,7 @@ if $first; then
   keep "$HOME/.local/share/omarchy-ambient/sources"
   keep "$config/omarchy/plugins/$plugin_id"
   keep "$cache/omarchy/ambient-selector"
+  keep "$config/omarchy/ambient/screensaver.conf"
 fi
 
 mkdir -p "$bindir" "$selector" "$config/omarchy/ambient/sources" "$config/omarchy/plugins" \

@@ -99,6 +99,14 @@ output=$(bash "$install_sh" --uninstall 2>&1) && status=0 || status=$?
 assert "uninstalling what it did not install stops" test "$status" -ne 0
 assert_eq "and touches nothing" "$(cat "$sources/demo/source.conf")" "mine"
 
+# A screensaver chosen among its scenes goes with them; an earlier choice comes back.
+printf 'source=amiga\n' >"$XDG_CONFIG_HOME/omarchy/ambient/screensaver.conf"
+rm -rf "$sources/demo" "$data/demo" "$HOME/.local/bin/omarchy-ambient"
+assert "it installs beside a chosen screensaver" bash "$install_sh"
+printf 'source=demo\n' >"$XDG_CONFIG_HOME/omarchy/ambient/screensaver.conf"
+assert "it uninstalls with a scene as the screensaver" bash "$install_sh" --uninstall
+assert_eq "the earlier screensaver is back" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/screensaver.conf")" "source=amiga"
+
 # Someone who already had Ambient's menu rows ends with the same menu, not stale rows.
 rm -rf "$sources/demo" "$data/demo" "$HOME/.local/bin/omarchy-ambient"
 menu=$XDG_CONFIG_HOME/omarchy/extensions/omarchy-menu.jsonc
