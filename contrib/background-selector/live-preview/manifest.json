@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "avillagran.ambient-selector",
+  "name": "Ambient ASCII Selector",
+  "version": "0.2.0",
+  "author": "Andr\u00e9s Villagr\u00e1n",
+  "description": "Live previews and Ambient-only application",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}
