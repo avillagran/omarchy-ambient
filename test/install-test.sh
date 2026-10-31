@@ -65,4 +65,34 @@ assert_eq "and says why" "$output" "Downloading $bundle
 omarchy-ambient: $bundle does not match its checksum"
 assert "and installs nothing" test ! -e "$sources/demo"
 
+# Somebody already using Ambient loses nothing, down to the last byte.
+for name in omarchy-plugin-enable; do stub "$name" 'exit 0'; done
+sed -i 's/corrupt$//' "$scratch/site/$bundle"
+tar -czf "$scratch/site/$bundle" -C "$scratch/pack" bundle
+(cd "$scratch/site" && sha256sum "$bundle" >SHA256SUMS)
+plugin=$XDG_CONFIG_HOME/omarchy/plugins/avillagran.ambient-selector
+mkdir -p "$sources/demo" "$plugin/old" "$data/demo/bin" "$HOME/.local/bin" "$HOME/.cache/omarchy/ambient-selector"
+printf 'mine\n' >"$sources/demo/source.conf"
+printf 'mine\n' >"$plugin/old/Service.qml"
+printf 'mine\n' >"$HOME/.local/bin/omarchy-ambient-background-select"
+printf 'mine\n' >"$HOME/.cache/omarchy/ambient-selector/mine.jpg"
+ln -s /somewhere/mine "$data/demo/bin/omarchy-ttfx-layer"
+printf '#!/bin/bash\necho mine\n' >"$HOME/.local/bin/omarchy-ambient"
+chmod +x "$HOME/.local/bin/omarchy-ambient"
+assert "it installs over an existing setup" bash "$install_sh"
+assert_eq "its source is in use" "$(cat "$sources/demo/source.conf")" "name=Demo"
+assert "and again" bash "$install_sh"
+assert "it uninstalls that too" bash "$install_sh" --uninstall
+assert_eq "the existing source is back" "$(cat "$sources/demo/source.conf")" "mine"
+assert_eq "the existing plugin is back" "$(cat "$plugin/old/Service.qml")" "mine"
+assert_eq "the existing command is back" "$(cat "$HOME/.local/bin/omarchy-ambient-background-select")" "mine"
+assert_eq "the existing poster is back" "$(cat "$HOME/.cache/omarchy/ambient-selector/mine.jpg")" "mine"
+assert_eq "the existing link is back" "$(readlink "$data/demo/bin/omarchy-ttfx-layer")" "/somewhere/mine"
+assert_eq "the existing program is back" "$("$HOME/.local/bin/omarchy-ambient")" "mine"
+assert "the backup is gone" test ! -e "$XDG_DATA_HOME/omarchy-ambient-backup"
+
+output=$(bash "$install_sh" --uninstall 2>&1) && status=0 || status=$?
+assert "uninstalling what it did not install stops" test "$status" -ne 0
+assert_eq "and touches nothing" "$(cat "$sources/demo/source.conf")" "mine"
+
 finish_tests
