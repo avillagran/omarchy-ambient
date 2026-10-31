@@ -130,4 +130,16 @@ assert "and resumed afterwards" eventually logged "resumed on DP-1" "$scratch/ba
 echo "background>>background" >&7
 eventually gone "$background"
 
+# A choice picks one thing inside a source, and the idle start honors it.
+make_source "$scratch/sources" chooser $'name=Chooser\nplacements=background screensaver' "
+echo \"\$OMARCHY_AMBIENT_CHOICE\" >'$scratch/chosen'
+exec sleep infinity"
+"$AMBIENT" screensaver --set chooser fx:bars
+timeout 3 "$AMBIENT" screensaver >/dev/null 2>&1 &
+assert "the screensaver gets its stored choice" eventually grep -qx 'fx:bars' "$scratch/chosen"
+wait
+assert "a bad choice is refused" bash -c "! '$AMBIENT' screensaver --set chooser 'a b' 2>/dev/null"
+"$AMBIENT" screensaver --set chooser
+assert "selecting again clears the choice" bash -c "! grep -q choice '$XDG_CONFIG_HOME/omarchy/ambient/screensaver.conf'"
+
 finish_tests

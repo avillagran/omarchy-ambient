@@ -187,7 +187,7 @@ done
 
 rm -rf "${config:?}/omarchy/plugins/$plugin_id"
 cp -r "$b/plugin" "$config/omarchy/plugins/$plugin_id"
-chmod +x "$config/omarchy/plugins/$plugin_id/bin/list.sh"
+find "$config/omarchy/plugins/$plugin_id" -name list.sh -exec chmod +x {} +
 # A link here must be replaced, not written through to whatever it points at.
 rm -f "$bindir/omarchy-ambient-background-select"
 cat >"$bindir/omarchy-ambient-background-select" <<SCRIPT
@@ -215,6 +215,7 @@ say ""
 say "Installed $(<"$b/VERSION")."
 say ""
 say "Try one:     omarchy-ambient start sand-clock-galaxy"
-say "Selector:    omarchy-ambient-background-select screensaver"
+say "Background:  omarchy-ambient-background-select screensaver"
+say "Screensaver: omarchy-ambient-background-select saver"
 say "Back:        omarchy-ambient stop"
 [[ :$PATH: == *:"$bindir":* ]] || say "Add $bindir to your PATH."

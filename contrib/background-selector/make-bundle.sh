@@ -22,9 +22,19 @@ make -s -C "$root" install DESTDIR="$b/ambient" PREFIX=
 cp "$renderer" "$b/selector/omarchy-ttfx-layer"
 cp "$here/background_selector.py" "$here/catalog.json" "$here/live-preview/run-preview.py" "$b/selector/"
 cp -r "$here/sources" "$here/posters" "$b/"
-mkdir "$b/plugin"
-cp -r "$here/live-preview/." "$b/plugin/"
-rm -f "$b/plugin/run-preview.py"
+# The shell caches QML by path, so each version loads from its own directory.
+mkdir -p "$b/plugin/v$version"
+cp -r "$here/live-preview/." "$b/plugin/v$version/"
+rm -f "$b/plugin/v$version/run-preview.py"
+mv "$b/plugin/v$version/manifest.json" "$b/plugin/"
+python3 -c '
+import json, sys
+path, version = sys.argv[1:]
+manifest = json.load(open(path))
+manifest["version"] = version
+manifest["entryPoints"]["service"] = f"v{version}/Service.qml"
+json.dump(manifest, open(path, "w"), indent=2)
+' "$b/plugin/manifest.json" "$version"
 printf '%s\n' "$version" >"$b/VERSION"
 
 bundle=omarchy-ambient-bundle-$(uname -m).tar.gz
