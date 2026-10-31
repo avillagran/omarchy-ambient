@@ -170,7 +170,11 @@ else
   : >"$selector/copied-ambient"
 fi
 
-cp "$b"/selector/* "$selector/"
+# Unlink first: a running scene keeps its old copy, and Linux refuses to overwrite it.
+for file in "$b"/selector/*; do
+  rm -f "$selector/$(basename "$file")"
+  cp "$file" "$selector/"
+done
 ln -sfn "$selector/omarchy-ttfx-layer" "$selector/ttfx-ambient-preview"
 command -v omarchy-ttfx-layer >/dev/null || ln -sfn "$selector/omarchy-ttfx-layer" "$bindir/omarchy-ttfx-layer"
 cp "$b"/posters/* "$cache/omarchy/ambient-selector/"

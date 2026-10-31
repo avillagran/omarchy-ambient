@@ -42,7 +42,15 @@ assert_eq "it waits for the shell to know the plugin" "$(cat "$scratch/tries")" 
 assert_eq "scenes keep running on battery" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=run"
 
 printf 'on_battery=pause\n' >"$XDG_CONFIG_HOME/omarchy/ambient/demo.conf"
+# An update must work while a scene runs from the installed renderer.
+cp "$(command -v sleep)" "$b/selector/omarchy-ttfx-layer"
+tar -czf "$scratch/site/$bundle" -C "$scratch/pack" bundle
+(cd "$scratch/site" && sha256sum "$bundle" >SHA256SUMS)
+assert "it installs the real program" bash "$install_sh"
+"$data/selector/omarchy-ttfx-layer" 30 &
+running=$!
 assert "it installs again" bash "$install_sh"
+kill "$running"
 assert_eq "a second run keeps the user's settings" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=pause"
 
 mkdir -p "$b/sources/other"
