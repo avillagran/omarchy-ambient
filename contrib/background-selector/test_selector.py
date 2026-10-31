@@ -4,14 +4,14 @@ from pathlib import Path
 p=Path(__file__).with_name('background_selector.py');s=importlib.util.spec_from_file_location('ambient_background_selector',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
 class Routing(unittest.TestCase):
  def test_active_mode_routing_uses_actual_background_not_saved_screensaver(self):
-  for status,category in [('none','theme'),('amiga 14651-Faster_Than_Hell','amiga'),('screensaver fx:matrix','screensaver'),('ttfx fixed','screensaver'),('matrix-reactive ','screensaver'),('eye-reactive ','screensaver'),('tunnel-reactive ','screensaver'),('neon-city ','screensaver'),('vector-highway ','screensaver'),('circuit-run ','screensaver'),('sunset-drive ','screensaver'),('','theme')]:
+  for status,category in [('none','theme'),('amiga 14651-Faster_Than_Hell','amiga'),('screensaver fx:matrix','background'),('ttfx fixed','background'),('matrix-reactive ','background'),('eye-reactive ','background'),('tunnel-reactive ','background'),('neon-city ','background'),('vector-highway ','background'),('circuit-run ','background'),('sunset-drive ','background'),('','theme')]:
    with self.subTest(status=status),patch.object(m,'capture',return_value=status):self.assertEqual(m.active_category(),category)
  def test_current_opens_selected_mode_without_applying_a_background(self):
-  for category in ('theme','screensaver','amiga'):
+  for category in ('theme','background','amiga'):
    with patch.object(m,'active_category',return_value=category),patch.object(m,'capture',return_value=''),patch.object(m,'run') as run:
     m.main(['current'])
     if category=='amiga':run.assert_called_once_with(m.AMBIENT,'start','amiga')
-    elif category=='screensaver':run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle')
+    elif category=='background':run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle')
     else:run.assert_not_called()
  def test_cancel_theme_keeps_background(self):
   with patch.object(m,'capture',return_value=''),patch.object(m,'run') as run:m.main(['theme']);run.assert_not_called()
@@ -23,11 +23,14 @@ class Routing(unittest.TestCase):
     m.main(['--apply-ascii',item['id']]);run.assert_called_once_with(m.AMBIENT,'start',item['source'],item['choice'])
  def test_the_same_carousel_picks_the_screensaver(self):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run') as run:
-   m.main(['saver']);run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle');run.reset_mock()
+   m.main(['screensaver']);run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle');run.reset_mock()
    m.main(['--apply-ascii','bars']);run.assert_called_once_with(m.AMBIENT,'screensaver','--set','screensaver','fx:bars');run.reset_mock()
    m.main(['--apply-ascii','neon-city']);run.assert_called_once_with(m.AMBIENT,'start','neon-city','')
    Path(d,'target').write_text('screensaver');run.reset_mock()
-   m.main(['screensaver']);m.main(['--apply-ascii','neon-city']);self.assertEqual(run.call_args.args[:3],(m.AMBIENT,'start','neon-city'))
+   m.main(['background']);m.main(['--apply-ascii','neon-city']);self.assertEqual(run.call_args.args[:3],(m.AMBIENT,'start','neon-city'))
+ def test_saver_stays_as_an_alias(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run'):
+   m.main(['saver']);self.assertTrue(m.for_screensaver())
  def test_unknown_picker_result_does_not_start(self):
   with patch.object(m,'run') as run:
    with self.assertRaises(ValueError):m.main(['--apply-ascii','untrusted'])

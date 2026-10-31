@@ -36,6 +36,8 @@ assert "the preview finds the renderer" test -x "$data/selector/ttfx-ambient-pre
 assert "the plugin is in place" test -x "$XDG_CONFIG_HOME/omarchy/plugins/avillagran.ambient-selector/bin/list.sh"
 assert "the poster is in the cache" test -f "$HOME/.cache/omarchy/ambient-selector/demo.jpg"
 assert "the command is on the path" test -x "$HOME/.local/bin/omarchy-ambient"
+assert "the selector command is on the path" test -x "$HOME/.local/bin/omarchy-ambient-select"
+assert_eq "the old name is an alias" "$(readlink "$HOME/.local/bin/omarchy-ambient-background-select")" omarchy-ambient-select
 assert_eq "it waits for the shell to know the plugin" "$(cat "$scratch/tries")" 3
 assert_eq "scenes keep running on battery" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=run"
 

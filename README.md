@@ -37,8 +37,8 @@ Remove it with the same command, ending in `| bash -s -- --uninstall`.
 
 ```sh
 omarchy-ambient start sand-clock-galaxy            # try one
-omarchy-ambient-background-select screensaver      # pick the background, with live previews
-omarchy-ambient-background-select saver            # pick the screensaver, the same way
+omarchy-ambient-select background                  # pick the background, with live previews
+omarchy-ambient-select screensaver                 # pick the screensaver, the same way
 omarchy-ambient stop                               # back to your wallpaper
 ```
 

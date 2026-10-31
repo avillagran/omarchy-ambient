@@ -89,7 +89,7 @@ uninstall() {
     rm -f "$bindir/omarchy-ambient"
   fi
   rm -rf "${config:?}/omarchy/plugins/$plugin_id" "$selector" "${cache:?}/omarchy/ambient-selector"
-  rm -f "$bindir/omarchy-ambient-background-select"
+  rm -f "$bindir/omarchy-ambient-select" "$bindir/omarchy-ambient-background-select"
   rmdir "$config/omarchy/ambient/sources" "$config/omarchy/ambient" 2>/dev/null || true
   restore_kept
   # The menu was already there: it must only list what is left.
@@ -145,6 +145,7 @@ first=true
 [[ -f $manifest ]] && first=false
 if $first; then
   keep "$bindir/omarchy-ambient"
+  keep "$bindir/omarchy-ambient-select"
   keep "$bindir/omarchy-ambient-background-select"
   keep "$HOME/.local/lib/omarchy-ambient"
   keep "$HOME/.local/share/omarchy-ambient/sources"
@@ -196,12 +197,14 @@ rm -rf "${config:?}/omarchy/plugins/$plugin_id"
 cp -r "$b/plugin" "$config/omarchy/plugins/$plugin_id"
 find "$config/omarchy/plugins/$plugin_id" -name list.sh -exec chmod +x {} +
 # A link here must be replaced, not written through to whatever it points at.
-rm -f "$bindir/omarchy-ambient-background-select"
-cat >"$bindir/omarchy-ambient-background-select" <<SCRIPT
+rm -f "$bindir/omarchy-ambient-select" "$bindir/omarchy-ambient-background-select"
+cat >"$bindir/omarchy-ambient-select" <<SCRIPT
 #!/bin/bash
 exec python3 "$selector/background_selector.py" "\$@"
 SCRIPT
-chmod +x "$bindir/omarchy-ambient-background-select"
+chmod +x "$bindir/omarchy-ambient-select"
+# The first name of this command, and the one the plugin calls.
+ln -s omarchy-ambient-select "$bindir/omarchy-ambient-background-select"
 
 # The shell only knows the plugin after a rescan, which takes a moment.
 enabled=false
@@ -222,7 +225,7 @@ say ""
 say "Installed $(<"$b/VERSION")."
 say ""
 say "Try one:     omarchy-ambient start sand-clock-galaxy"
-say "Background:  omarchy-ambient-background-select screensaver"
-say "Screensaver: omarchy-ambient-background-select saver"
+say "Background:  omarchy-ambient-select background"
+say "Screensaver: omarchy-ambient-select screensaver"
 say "Back:        omarchy-ambient stop"
 [[ :$PATH: == *:"$bindir":* ]] || say "Add $bindir to your PATH."

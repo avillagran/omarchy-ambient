@@ -51,7 +51,7 @@ def active_category():
     source=capture(AMBIENT,'status').split(maxsplit=1)
     source=source[0] if source else 'none'
     if source=='amiga':return 'amiga'
-    if source in ("screensaver","ttfx","matrix-reactive","eye-reactive","tunnel-reactive","neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","city-rain","jellyfish","cockpit","hourglass","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"):return "screensaver"
+    if source in ("screensaver","ttfx","matrix-reactive","eye-reactive","tunnel-reactive","neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","city-rain","jellyfish","cockpit","hourglass","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"):return "background"
     return 'theme'
 
 def for_screensaver():
@@ -82,9 +82,9 @@ def main(args):
     if args==['current']:args=[active_category()]
     if len(args)==2 and args[0]=='--list':
         print(json.dumps(choices(args[1]),ensure_ascii=False,indent=2));return
-    if len(args)!=1 or args[0] not in ('theme','screensaver','saver','amiga','random'):
-        raise ValueError('usage: omarchy-ambient-background-select theme|screensaver|saver|amiga|random|current')
-    category=args[0]
+    if len(args)!=1 or args[0] not in ('background','screensaver','saver','theme','amiga','random'):
+        raise ValueError('usage: omarchy-ambient-select background|screensaver|theme|amiga|random|current')
+    category={'saver':'screensaver'}.get(args[0],args[0])
     if category=='random':
         available={k:choices(k) for k in ('theme','screensaver','amiga')}
         available={k:v for k,v in available.items() if v}
@@ -98,7 +98,7 @@ def main(args):
     elif category=='amiga':run(AMBIENT,'start','amiga')
     else:
         CACHE.mkdir(parents=True,exist_ok=True)
-        if category=='saver':TARGET.write_text('screensaver')
+        if category=='screensaver':TARGET.write_text('screensaver')
         else:TARGET.unlink(missing_ok=True)
         run('omarchy-shell','-q','avillagran.ambient-selector','toggle')
 
