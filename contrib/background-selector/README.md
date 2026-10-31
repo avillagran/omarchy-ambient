@@ -13,6 +13,9 @@ category and one item per activation, with no timer. Applying always goes throug
 - `posters/` holds the still images for the carousel.
 - `ambient-background-selector.lua` binds the active category to a shortcut.
 
+The same carousel picks the screensaver: `background_selector.py saver` stores the
+choice with `omarchy-ambient screensaver --set` instead of starting it.
+
 ## Install
 
 The `install.sh` at the top of this repository installs all of this for the current

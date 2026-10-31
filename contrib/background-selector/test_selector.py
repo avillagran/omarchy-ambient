@@ -1,4 +1,4 @@
-import importlib.util, unittest
+import importlib.util, tempfile, unittest
 from unittest.mock import patch
 from pathlib import Path
 p=Path(__file__).with_name('background_selector.py');s=importlib.util.spec_from_file_location('ambient_background_selector',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
@@ -21,6 +21,13 @@ class Routing(unittest.TestCase):
    self.assertTrue(item.get('poster',item['id']+'.jpg').endswith('.jpg'))
    with patch.object(m,'run') as run:
     m.main(['--apply-ascii',item['id']]);run.assert_called_once_with(m.AMBIENT,'start',item['source'],item['choice'])
+ def test_the_same_carousel_picks_the_screensaver(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run') as run:
+   m.main(['saver']);run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle');run.reset_mock()
+   m.main(['--apply-ascii','bars']);run.assert_called_once_with(m.AMBIENT,'screensaver','--set','screensaver','fx:bars');run.reset_mock()
+   m.main(['--apply-ascii','neon-city']);run.assert_called_once_with(m.AMBIENT,'start','neon-city','')
+   Path(d,'target').write_text('screensaver');run.reset_mock()
+   m.main(['screensaver']);m.main(['--apply-ascii','neon-city']);self.assertEqual(run.call_args.args[:3],(m.AMBIENT,'start','neon-city'))
  def test_unknown_picker_result_does_not_start(self):
   with patch.object(m,'run') as run:
    with self.assertRaises(ValueError):m.main(['--apply-ascii','untrusted'])

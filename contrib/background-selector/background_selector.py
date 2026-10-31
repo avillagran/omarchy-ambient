@@ -7,6 +7,8 @@ DATA=H/'.local/share/omarchy-ambient'
 CACHE=H/'.cache/omarchy/ambient-selector'
 CATALOG=Path(__file__).resolve().with_name('catalog.json')
 AMBIENT=H/'.local/bin/omarchy-ambient'
+# The carousel picks for the background or for the screensaver: same scenes, same engine.
+TARGET=CACHE/'target'
 
 def run(*args):
     subprocess.run([str(x) for x in args],check=True)
@@ -52,12 +54,17 @@ def active_category():
     if source in ("screensaver","ttfx","matrix-reactive","eye-reactive","tunnel-reactive","neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","city-rain","jellyfish","cockpit","hourglass","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"):return "screensaver"
     return 'theme'
 
+def for_screensaver():
+    return TARGET.exists()
+
 def main(args):
     if args==['--preview-list']:
         for i in choices('screensaver'):
             print('\t'.join(['audio',i['id'],i['label'],str(CACHE/i.get('poster',i['id']+'.jpg')),'',i['id']]))
         return
     if args==['--current-choice']:
+        if for_screensaver():
+            print(capture(AMBIENT,'screensaver','--get'));return
         state=capture(AMBIENT,'status').split(maxsplit=1)
         source=state[0] if state else 'none'
         print(state[1][3:] if len(state)>1 and state[1].startswith('fx:') else source)
@@ -65,14 +72,18 @@ def main(args):
     if len(args)==2 and args[0]=='--apply-ascii':
         item=next((i for i in choices('screensaver') if i['id']==args[1]),None)
         if item is None:raise ValueError('unknown ASCII effect')
-        apply('screensaver',item);return
+        if for_screensaver():
+            TARGET.unlink(missing_ok=True)
+            run(AMBIENT,'screensaver','--set',item['source'],item.get('choice',''))
+        else:apply('screensaver',item)
+        return
     if args==['--current-category']:
         print(active_category());return
     if args==['current']:args=[active_category()]
     if len(args)==2 and args[0]=='--list':
         print(json.dumps(choices(args[1]),ensure_ascii=False,indent=2));return
-    if len(args)!=1 or args[0] not in ('theme','screensaver','amiga','random'):
-        raise ValueError('usage: omarchy-ambient-background-select theme|screensaver|amiga|random|current')
+    if len(args)!=1 or args[0] not in ('theme','screensaver','saver','amiga','random'):
+        raise ValueError('usage: omarchy-ambient-background-select theme|screensaver|saver|amiga|random|current')
     category=args[0]
     if category=='random':
         available={k:choices(k) for k in ('theme','screensaver','amiga')}
@@ -85,7 +96,11 @@ def main(args):
         picked=capture('omarchy-theme-bg-switcher')
         if picked:apply(category,{'path':picked})
     elif category=='amiga':run(AMBIENT,'start','amiga')
-    else:run('omarchy-shell','-q','avillagran.ambient-selector','toggle')
+    else:
+        CACHE.mkdir(parents=True,exist_ok=True)
+        if category=='saver':TARGET.write_text('screensaver')
+        else:TARGET.unlink(missing_ok=True)
+        run('omarchy-shell','-q','avillagran.ambient-selector','toggle')
 
 if __name__=='__main__':
     try:main(sys.argv[1:])

@@ -457,10 +457,15 @@ screensaver_selected() {
   fi
 }
 
+screensaver_choice() {
+  sed -n 's/^[[:space:]]*choice[[:space:]]*=[[:space:]]*\([A-Za-z0-9:._-]*\).*$/\1/p' "$SCREENSAVER_CONF" 2>/dev/null
+}
+
 # Selecting a source prepares it now, so the idle timeout never has to
-# install or download anything.
+# install or download anything. A choice picks one thing inside the source.
 select_screensaver() {
-  local id=$1 dir temp
+  local id=$1 choice=$2 dir temp
+  [[ $choice =~ ^[A-Za-z0-9:._-]*$ ]] || fail "$choice is not a valid choice"
   if [[ $id != text ]]; then
     dir=$(source_dir "$id") || fail "There is no live screensaver named $id"
     supports "$id" "$dir" screensaver || fail "$(setting "$id" "$dir" name "$id") can't be a screensaver"
@@ -470,6 +475,7 @@ select_screensaver() {
   mkdir -p "$CONFIG_DIR"
   temp=$(mktemp "$SCREENSAVER_CONF.XXXXXX")
   echo "source=$id" >"$temp"
+  [[ -z $choice ]] || echo "choice=$choice" >>"$temp"
   mv -f "$temp" "$SCREENSAVER_CONF"
 }
 
@@ -477,6 +483,7 @@ select_screensaver() {
 # at a time; another call while it runs does nothing.
 run_screensaver() {
   local id=${1:-$(screensaver_selected)} choice=$2 dir
+  [[ -n $1 || -n $choice ]] || choice=$(screensaver_choice)
   [[ $id != text ]] || { echo "No live screensaver is selected" >&2; exit 1; }
   dir=$(source_dir "$id") || fail "There is no live screensaver named $id"
   supports "$id" "$dir" screensaver || fail "$(setting "$id" "$dir" name "$id") can't be a screensaver"
@@ -816,8 +823,8 @@ case $1 in
     case $2 in
       --get) screensaver_selected ;;
       --set)
-        [[ -n $3 ]] || { echo "Usage: omarchy-ambient screensaver --set <source|text>" >&2; exit 1; }
-        select_screensaver "$3"
+        [[ -n $3 ]] || { echo "Usage: omarchy-ambient screensaver --set <source|text> [choice]" >&2; exit 1; }
+        select_screensaver "$3" "$4"
         ;;
       -*) echo "$usage" >&2; exit 1 ;;
       *) run_screensaver "$2" "$3" ;;

@@ -37,10 +37,12 @@ Remove it with the same command, ending in `| bash -s -- --uninstall`.
 
 ```sh
 omarchy-ambient start sand-clock-galaxy            # try one
-omarchy-ambient-background-select screensaver      # browse them with live previews
+omarchy-ambient-background-select screensaver      # pick the background, with live previews
+omarchy-ambient-background-select saver            # pick the screensaver, the same way
 omarchy-ambient stop                               # back to your wallpaper
 ```
 
+One engine runs them all: every scene works as a background and as a screensaver.
 Every scene is drawn from text glyphs on the GPU, reacts to what is playing, and
 follows the cursor.
 
