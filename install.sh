@@ -188,6 +188,8 @@ done
 rm -rf "${config:?}/omarchy/plugins/$plugin_id"
 cp -r "$b/plugin" "$config/omarchy/plugins/$plugin_id"
 chmod +x "$config/omarchy/plugins/$plugin_id/bin/list.sh"
+# A link here must be replaced, not written through to whatever it points at.
+rm -f "$bindir/omarchy-ambient-background-select"
 cat >"$bindir/omarchy-ambient-background-select" <<SCRIPT
 #!/bin/bash
 exec python3 "$selector/background_selector.py" "\$@"
