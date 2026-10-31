@@ -4,12 +4,4 @@ for name in OUTPUT WIDTH HEIGHT SCALE NAMESPACE LAYER KEYBOARD; do
   new=OMARCHY_AMBIENT_$name
   export "OMARCHY_BG_LIVE_$name=${!new}"
 done
-resolution=${OMARCHY_AMBIENT_SETTING_RESOLUTION:-auto}
-if [[ $resolution == auto ]]; then
-  width=${OMARCHY_AMBIENT_WIDTH:-1728}
-  [[ $width =~ ^[0-9]+$ ]] || width=1728
-  resolution=$(((width+864)/1728))
-  if ((resolution<1)); then resolution=1; fi
-  if ((resolution>8)); then resolution=8; fi
-fi
-exec "$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer" --neon-scene neon-city --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}" --resolution "$resolution"
+exec "$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer" --neon-scene neon-city --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}" --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-auto}"
