@@ -10,27 +10,14 @@ category and one item per activation, with no timer. Applying always goes throug
 - `live-preview/` is an Omarchy shell plugin: a slice carousel with live ASCII
   previews and static posters for the slices next to the selected one.
 - `sources/` holds one Ambient source per scene.
+- `posters/` holds the still images for the carousel.
 - `ambient-background-selector.lua` binds the active category to a shortcut.
-
-## Requirements
-
-The scenes need an `omarchy-ttfx-layer` build with `--neon-scene`, and the live
-previews need its `ttfx-ambient-preview` mode. Each source runs
-`$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer`, so link that binary into the data
-directory of every source you install.
 
 ## Install
 
-1. Copy `background_selector.py`, `catalog.json` and `live-preview/run-preview.py` to
-   `~/.local/share/omarchy-ambient/selector/`, next to the
-   `ttfx-ambient-preview` binary.
-2. Copy `sources/*` to `~/.config/omarchy/ambient/sources/`.
-3. Copy `live-preview/` to `~/.config/omarchy/plugins/avillagran.ambient-selector/`.
-4. Point the Style > Background menu entries at `background_selector.py` with the
-   argument `theme`, `screensaver`, `amiga` or `random`.
-
-Posters are read from `~/.cache/omarchy/ambient-selector/`, using the `poster` name
-in `catalog.json`.
+The `install.sh` at the top of this repository installs all of this for the current
+user. It downloads a release bundle, which `make-bundle.sh` builds from this directory
+and an `omarchy-ttfx-layer` binary with `--neon-scene`.
 
 ## Notes
 

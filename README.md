@@ -26,6 +26,35 @@ the screensaver.
 Anyone can add more: a terminal program, an emulator, a shader, a game. See
 [Creating a live background](docs/creating-sources.md).
 
+## Try the ASCII scenes
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/avillagran/omarchy-ambient/main/install.sh | bash
+```
+
+It installs for your user under `~/.local`, without sudo, and verifies the download.
+Remove it with the same command, ending in `| bash -s -- --uninstall`.
+
+```sh
+omarchy-ambient start sand-clock-galaxy            # try one
+omarchy-ambient-background-select screensaver      # browse them with live previews
+omarchy-ambient stop                               # back to your wallpaper
+```
+
+Every scene is drawn from text glyphs on the GPU, reacts to what is playing, and
+follows the cursor.
+
+| | | |
+|---|---|---|
+| ![Sunset Drive](docs/media/sunset-drive.jpg) | ![Lunar Drift](docs/media/lunar-drift.jpg) | ![Neon City](docs/media/neon-city.jpg) |
+| Sunset Drive | Lunar Drift | Neon City |
+| ![Neon Transit](docs/media/neon-transit.jpg) | ![Eye](docs/media/eye.jpg) | ![Cockpit](docs/media/cockpit.jpg) |
+| Neon Transit | Eye | Cockpit |
+| ![Hourglass](docs/media/hourglass.jpg) | ![Jellyfish](docs/media/jellyfish.jpg) | ![Data Globe](docs/media/data-globe.jpg) |
+| Hourglass | Jellyfish | Data Globe |
+| ![Sand Clock Galaxy](docs/media/sand-clock-galaxy.jpg) | ![Sand Clock Chladni](docs/media/sand-clock-chladni.jpg) | ![Sand Clock Dunes](docs/media/sand-clock-dunes.jpg) |
+| Sand Clock Galaxy | Sand Clock Chladni | Sand Clock Dunes |
+
 ## How it works
 
 Each live background is a program that draws its own layer surface on the

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Finds a build of the GPU layer renderer that has the standalone mode, and
+# links it as $OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer. The program
+# selects its standalone mode from that name.
+
+link=$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer
+
+capable() {
+  [[ -x $1 ]] && [[ $(timeout 3 "$1" --standalone --probe --capabilities 2>/dev/null) == "omarchy-ttfx-layer capabilities: text-file-v1 standalone-config-v1" ]]
+}
+
+for candidate in "$OMARCHY_AMBIENT_SETTING_BINARY" "$(command -v omarchy-ttfx-layer)"; do
+  [[ -n $candidate ]] || continue
+  candidate=$(readlink -f "$candidate")
+  if capable "$candidate"; then
+    mkdir -p "${link%/*}"
+    [[ $(readlink "$link") == "$candidate" ]] || ln -sfn "$candidate" "$link"
+    exit 0
+  fi
+done
+
+echo "Omarchy Effects needs omarchy-ttfx-layer with text-file-v1 and standalone-config-v1: install the omarchy-ttfx-layer package, or set binary= in ~/.config/omarchy/ambient/ttfx.conf" >&2
+exit 1
