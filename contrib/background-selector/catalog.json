@@ -62,11 +62,11 @@
   "poster": "data-globe-v1.jpg"
  },
  {
-  "id": "city-rain",
-  "label": "City Rain",
-  "source": "city-rain",
+  "id": "aquarium",
+  "label": "Aquarium",
+  "source": "aquarium",
   "choice": "",
-  "poster": "city-rain-v1.jpg"
+  "poster": "aquarium-v1.jpg"
  },
  {
   "id": "jellyfish",
@@ -81,13 +81,6 @@
   "source": "cockpit",
   "choice": "",
   "poster": "cockpit-v1.jpg"
- },
- {
-  "id": "hourglass",
-  "label": "Hourglass",
-  "source": "hourglass",
-  "choice": "",
-  "poster": "hourglass-v1.jpg"
  },
  {
   "id": "sand-clock",

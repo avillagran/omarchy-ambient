@@ -52,8 +52,8 @@ follows the cursor.
 | Sunset Drive | Lunar Drift | Neon City |
 | ![Neon Transit](docs/media/neon-transit.jpg) | ![Eye](docs/media/eye.jpg) | ![Cockpit](docs/media/cockpit.jpg) |
 | Neon Transit | Eye | Cockpit |
-| ![Hourglass](docs/media/hourglass.jpg) | ![Jellyfish](docs/media/jellyfish.jpg) | ![Data Globe](docs/media/data-globe.jpg) |
-| Hourglass | Jellyfish | Data Globe |
+| ![Aquarium](docs/media/aquarium.jpg) | ![Jellyfish](docs/media/jellyfish.jpg) | ![Data Globe](docs/media/data-globe.jpg) |
+| Aquarium | Jellyfish | Data Globe |
 | ![Sand Clock Galaxy](docs/media/sand-clock-galaxy.jpg) | ![Sand Clock Chladni](docs/media/sand-clock-chladni.jpg) | ![Sand Clock Dunes](docs/media/sand-clock-dunes.jpg) |
 | Sand Clock Galaxy | Sand Clock Chladni | Sand Clock Dunes |
 

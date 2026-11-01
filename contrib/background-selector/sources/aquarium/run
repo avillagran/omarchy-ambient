@@ -4,4 +4,4 @@ for name in OUTPUT WIDTH HEIGHT SCALE NAMESPACE LAYER KEYBOARD; do
   new=OMARCHY_AMBIENT_$name
   export "OMARCHY_BG_LIVE_$name=${!new}"
 done
-exec "$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer" --neon-scene city-rain --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}" --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-auto}"
+exec "$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer" --neon-scene aquarium --fps "${OMARCHY_AMBIENT_SETTING_FPS:-20}" --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-auto}"

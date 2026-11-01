@@ -14,7 +14,7 @@ export OMARCHY_AMBIENT_SETTING_AUDIO=1
 args=(
   --effects "${OMARCHY_AMBIENT_SETTING_EFFECTS:-matrix,decrypt,rings,thunderstorm}"
   --rotate "${OMARCHY_AMBIENT_SETTING_ROTATE:-30}"
-  --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}"
+  --fps "${OMARCHY_AMBIENT_SETTING_FPS:-20}"
   --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-2}"
 )
 # An explicit source override wins; otherwise share Omarchy's text/image
