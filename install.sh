@@ -45,6 +45,15 @@ restore_kept() {
 
 is_ours() { [[ -f $manifest ]] && grep -qxF "$1" "$manifest"; }
 
+forget_source() {
+  local id=$1 conf
+  rm -rf "${config:?}/omarchy/ambient/sources/$id" "${data:?}/omarchy-ambient/$id/bin"
+  # Ours, unless the user has since edited it.
+  conf=$config/omarchy/ambient/$id.conf
+  if [[ $(cat "$conf" 2>/dev/null) == on_battery=run ]]; then rm -f "$conf"; fi
+  rmdir "$data/omarchy-ambient/$id" 2>/dev/null || true
+}
+
 uninstall() {
   local id conf active rebuild_menu=false
   [[ -f $manifest ]] || die "nothing to remove: this installer did not install it here"
@@ -71,11 +80,7 @@ uninstall() {
   if [[ -f $manifest ]]; then
     while read -r id; do
       [[ $id =~ ^[a-z0-9-]+$ ]] || continue
-      rm -rf "${config:?}/omarchy/ambient/sources/$id" "${data:?}/omarchy-ambient/$id/bin"
-      # Ours, unless the user has since edited it.
-      conf=$config/omarchy/ambient/$id.conf
-      [[ $(cat "$conf" 2>/dev/null) == on_battery=run ]] && rm -f "$conf"
-      rmdir "$data/omarchy-ambient/$id" 2>/dev/null || true
+      forget_source "$id"
     done <"$manifest"
   fi
   # Only what this installer put there, never a build or package of the user's.
@@ -88,7 +93,7 @@ uninstall() {
   elif [[ -L $bindir/omarchy-ambient ]]; then
     rm -f "$bindir/omarchy-ambient"
   fi
-  rm -rf "${config:?}/omarchy/plugins/$plugin_id" "$selector" "${cache:?}/omarchy/ambient-selector"
+  rm -rf "${config:?}/omarchy/plugins/$plugin_id" "$selector" "${cache:?}/omarchy/ambient-selector" "${cache:?}/omarchy-ttfx-layer"
   rm -f "$bindir/omarchy-ambient-select" "$bindir/omarchy-ambient-background-select"
   rmdir "$config/omarchy/ambient/sources" "$config/omarchy/ambient" 2>/dev/null || true
   restore_kept
@@ -197,6 +202,14 @@ for dir in "$b"/sources/*/; do
   printf '%s\n' "$id" >>"$manifest"
 done
 
+# A source this release no longer ships must not stay behind in the lists.
+while read -r id; do
+  [[ $id =~ ^[a-z0-9-]+$ && ! -d $b/sources/$id ]] || continue
+  [[ $("$bindir/omarchy-ambient" status 2>/dev/null | awk '{print $1}') != "$id" ]] ||
+    "$bindir/omarchy-ambient" stop >/dev/null 2>&1 || true
+  forget_source "$id"
+done <<<"$known"
+
 rm -rf "${config:?}/omarchy/plugins/$plugin_id"
 cp -r "$b/plugin" "$config/omarchy/plugins/$plugin_id"
 find "$config/omarchy/plugins/$plugin_id" -name list.sh -exec chmod +x {} +
@@ -223,7 +236,10 @@ $enabled || say "Enable the plugin by hand: omarchy-plugin-enable $plugin_id"
 if $first && [[ $("$bindir/omarchy-ambient" installed 2>/dev/null) != "menu=yes idle=yes" ]]; then
   : >"$selector/added-menu"
 fi
-"$bindir/omarchy-ambient" install >/dev/null 2>&1 || say "Could not add the menu rows: run omarchy-ambient install."
+# A later run only refreshes rows that are there: someone may have removed them.
+if $first || [[ $("$bindir/omarchy-ambient" installed 2>/dev/null) == menu=yes* ]]; then
+  "$bindir/omarchy-ambient" install >/dev/null 2>&1 || say "Could not add the menu rows: run omarchy-ambient install."
+fi
 
 say ""
 say "Installed $(<"$b/VERSION")."
