@@ -13,6 +13,37 @@ class Routing(unittest.TestCase):
     if category=='amiga':run.assert_called_once_with(m.AMBIENT,'start','amiga')
     elif category=='background':run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle')
     else:run.assert_not_called()
+ def test_resolution_steps_keep_other_settings_and_leave_no_empty_file(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)):
+   conf=Path(d)/'neon-city.conf';conf.write_text('audio=1\nresolution=auto+1\n')
+   self.assertEqual(m.resolution_steps('neon-city'),1)
+   m.set_resolution_steps('neon-city',-2);self.assertEqual(conf.read_text(),'audio=1\nresolution=auto-2\n')
+   conf.write_text('resolution=3\n');self.assertEqual(m.resolution_steps('neon-city'),0)
+   m.set_resolution_steps('neon-city',0);self.assertFalse(conf.exists())
+ def test_arrows_apply_at_once_and_escape_restores_the_previous_background(self):
+  item={'id':'neon-city','source':'neon-city'}
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)/'c'),patch.object(m,'CACHE',Path(d)),patch.object(m,'RESOLUTION_UNDO',Path(d)/'undo'),patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'capture',return_value='screensaver fx:matrix'),patch.object(m,'run') as run:
+   m.tune(item,1,20);m.tune(item,2,40)
+   self.assertEqual(run.call_args.args,(m.AMBIENT,'start','neon-city',''));self.assertEqual(m.resolution_steps('neon-city'),2);self.assertEqual(m.fps_limit('neon-city'),40)
+   m.revert_tuning()
+   self.assertEqual(m.resolution_steps('neon-city'),0);self.assertEqual(m.fps_limit('neon-city'),20);run.assert_called_with(m.AMBIENT,'start','screensaver','fx:matrix');self.assertFalse((Path(d)/'undo').exists())
+ def test_arrows_in_screensaver_mode_never_touch_the_background(self):
+  item={'id':'neon-city','source':'neon-city'}
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)/'c'),patch.object(m,'CACHE',Path(d)),patch.object(m,'RESOLUTION_UNDO',Path(d)/'undo'),patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'capture',return_value='none'),patch.object(m,'run') as run:
+   (Path(d)/'target').write_text('screensaver')
+   m.tune(item,1,30);m.revert_tuning();run.assert_not_called();self.assertEqual(m.resolution_steps('neon-city'),0)
+ def test_fps_limit_only_takes_offered_values_and_twenty_needs_no_line(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)):
+   conf=Path(d)/'neon-city.conf'
+   self.assertEqual(m.fps_limit('neon-city'),20)
+   m.set_fps_limit('neon-city',140);self.assertEqual(conf.read_text(),'fps=140\n');self.assertEqual(m.fps_limit('neon-city'),140)
+   conf.write_text('fps=900\n');self.assertEqual(m.fps_limit('neon-city'),20)
+   conf.write_text('fps=auto\n');self.assertEqual(m.fps_limit('neon-city'),20)
+   m.set_fps_limit('neon-city',20);self.assertFalse(conf.exists())
+ def test_fps_counter_toggles_a_flag_the_scenes_watch(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'FPS_COUNTER',Path(d)/'layer'/'show-fps') as flag:
+   m.toggle_fps_counter();self.assertTrue(flag.exists())
+   m.toggle_fps_counter();self.assertFalse(flag.exists())
  def test_cancel_theme_keeps_background(self):
   with patch.object(m,'capture',return_value=''),patch.object(m,'run') as run:m.main(['theme']);run.assert_not_called()
  def test_every_ascii_choice_has_preview_and_uses_ambient(self):

@@ -36,3 +36,21 @@ and an `omarchy-ttfx-layer` binary with `--neon-scene`.
 ## Tests
 
     python3 contrib/background-selector/test_selector.py
+
+## Resolution
+
+In the carousel, the up and down arrows make the selected scene finer or
+coarser, up to four steps each way from the automatic grid. A background
+changes behind the carousel at once; in screensaver mode the choice is stored
+for the next run. Enter keeps it and Escape restores the previous background.
+
+The choice is one line per source, `resolution=auto+2`, in
+`~/.config/omarchy/ambient/<source>.conf`. All the effects under the
+`screensaver` source share it.
+
+The plus and minus keys set the frame rate limit of the selected scene by 10,
+or by 20 with Shift, from 20, the default, to 240 fps: `fps=40` in the same
+file. The screen's refresh rate still has the last word. On battery every scene
+drops to 20 and returns to its limit on the charger.
+
+F shows or hides the frame rate on every running scene, without restarting it.

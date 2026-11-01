@@ -69,6 +69,30 @@ Item {
   property int fxTick: 0
   property int fxVisCount: 0
 
+  // Live previews repaint every cell from JavaScript, so a slow machine trades
+  // grid and frame rate for smoothness. A fast one never leaves the first level.
+  readonly property var previewLevels: [
+    { cols: 174, rows: 50, fps: 60 },
+    { cols: 116, rows: 33, fps: 30 },
+    { cols: 87, rows: 25, fps: 20 }
+  ]
+  readonly property int previewPaintBudgetMs: 40
+  readonly property int previewSettlePaints: 6
+  readonly property int previewSamplePaints: 12
+  property int previewLevel: 0
+  property real previewPaintMs: 0
+  property var previewPaints: []
+  function notePreviewPaint(ms) {
+    root.previewPaints.push(ms)
+    var paints = root.previewPaints.slice(root.previewSettlePaints)
+    if (paints.length < root.previewSamplePaints) return
+    paints.sort(function(a, b) { return a - b })
+    root.previewPaintMs = paints[Math.floor(paints.length / 2)]
+    root.previewPaints = []
+    if (root.previewPaintMs > root.previewPaintBudgetMs && root.previewLevel < root.previewLevels.length - 1)
+      root.previewLevel += 1
+  }
+
   function fxLine(line) {
     root.fxLinesSeen += 1
     var d
@@ -90,10 +114,10 @@ Item {
     }
   }
 
-  function fxSub(fx, cols, rows) {
+  function fxSub(fx, cols, rows, fps) {
     root.fxSubCount += 1
     if (!fxDaemon.running) return
-    fxDaemon.write(JSON.stringify({ cmd: "sub", fx: fx, cols: cols, rows: rows }) + "\n")
+    fxDaemon.write(JSON.stringify({ cmd: "sub", fx: fx, cols: cols, rows: rows, fps: fps }) + "\n")
   }
 
   function fxUnsub(fx) {
@@ -181,12 +205,74 @@ Item {
     root.amigaMute = !root.amigaMute
   }
 
-  function cycleParallaxResolution(delta) {}
+  // The arrows change how fine the selected scene is drawn. A background shows
+  // it right away behind the carousel; Escape puts everything back.
+  readonly property int maxResolutionSteps: 4
+  property int resolutionSteps: 0
+  property string resolutionItem: ""
+  property bool resolutionChanged: false
+  readonly property int minFps: 20
+  readonly property int maxFps: 240
+  readonly property int fpsStep: 10
+  property int fpsLimit: minFps
+  readonly property string resolutionLabel: resolutionSteps === 0 ? "auto" : (resolutionSteps > 0 ? "+" : "") + resolutionSteps
+  property bool fpsCounter: false
+  function toggleFpsCounter() {
+    root.fpsCounter=!root.fpsCounter
+    Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--fps-counter"])
+  }
+  function stepResolution(delta) {
+    const item=root.currentItems[root.selectedIndex]
+    if (!item || item.type !== "audio") return
+    const next=Math.max(-root.maxResolutionSteps,Math.min(root.maxResolutionSteps,root.resolutionSteps+delta))
+    if (next === root.resolutionSteps) return
+    root.resolutionSteps=next
+    root.resolutionItem=item.path
+    resolutionApplyTimer.restart()
+  }
+  function stepFpsLimit(delta) {
+    const item=root.currentItems[root.selectedIndex]
+    if (!item || item.type !== "audio") return
+    const next=Math.max(root.minFps,Math.min(root.maxFps,root.fpsLimit+delta))
+    if (next === root.fpsLimit) return
+    root.fpsLimit=next
+    root.resolutionItem=item.path
+    resolutionApplyTimer.restart()
+  }
+  function sendTuning() {
+    root.resolutionChanged=true
+    Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--tune",root.resolutionItem,String(root.resolutionSteps),String(root.fpsLimit)])
+  }
+  function flushResolution() {
+    if (!resolutionApplyTimer.running) return
+    resolutionApplyTimer.stop()
+    root.sendTuning()
+  }
+  function readResolution() {
+    root.flushResolution()
+    const item=root.currentItems[root.selectedIndex]
+    root.resolutionSteps=0
+    root.fpsLimit=root.minFps
+    if (!item || item.type !== "audio") return
+    resolutionRead.command=[root.home+"/.local/bin/omarchy-ambient-background-select","--tune-get",item.path]
+    resolutionRead.running=true
+  }
+  onSelectedIndexChanged: readResolution()
+  onCurrentItemsChanged: readResolution()
 
-  function close(restore) { if (!restore) root.applyCurrent(); root.opened=false }
+  function close(restore) {
+    if (!restore) { root.applyCurrent(); return }
+    resolutionApplyTimer.stop()
+    if (root.resolutionChanged) Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--tune-revert"])
+    root.resolutionChanged=false
+    root.opened=false
+  }
   function applyCurrent() {
     const item=root.currentItems[root.selectedIndex]
-    if (item) Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--apply-ascii",item.path])
+    const pending=resolutionApplyTimer.running && item && root.resolutionItem === item.path
+    resolutionApplyTimer.stop()
+    root.resolutionChanged=false
+    if (item) Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--apply-ascii",item.path].concat(pending ? [String(root.resolutionSteps),String(root.fpsLimit)] : []))
     root.opened=false
   }
   function loadCategory(idx, silent) {
@@ -202,16 +288,6 @@ Item {
     const cat = root.categories[idx].id
     listProc.command = ["bash", root.scriptPath("bin/list.sh"), cat]
     listProc.running = true
-  }
-
-  function moveCategory(dir) {
-    if (root.collapsing) return
-    const next = Math.max(0, Math.min(root.categories.length - 1, root.categoryIndex + dir))
-    if (next === root.categoryIndex) return
-    // Phase 1: compress the currently open items.
-    root.pendingCategory = next
-    root.collapsing = true
-    collapseTimer.restart()
   }
 
   function moveItem(dir) {
@@ -303,6 +379,33 @@ Item {
       if (applied === current) { root.selectedIndex = i; return }
     }
     root.selectedIndex = 0
+  }
+
+  Timer {
+    id: resolutionApplyTimer
+    interval: 300
+    onTriggered: root.sendTuning()
+  }
+
+  Process {
+    id: fpsCounterRead
+    command: [root.home+"/.local/bin/omarchy-ambient-background-select","--fps-counter-get"]
+    running: root.opened
+    stdout: StdioCollector {
+      onStreamFinished: root.fpsCounter=this.text.trim()==="1"
+    }
+  }
+
+  Process {
+    id: resolutionRead
+    stdout: StdioCollector {
+      onStreamFinished: {
+        if (resolutionApplyTimer.running) return
+        const tuning=this.text.trim().split(" ")
+        root.resolutionSteps=parseInt(tuning[0])||0
+        root.fpsLimit=parseInt(tuning[1])||root.minFps
+      }
+    }
   }
 
   Process {
@@ -498,10 +601,13 @@ Item {
           root.moveItem(1)
           event.accepted = true
         } else if (event.key === Qt.Key_Up) {
-          root.moveCategory(-1)
+          root.stepResolution(1)
           event.accepted = true
         } else if (event.key === Qt.Key_Down) {
-          root.moveCategory(1)
+          root.stepResolution(-1)
+          event.accepted = true
+        } else if (event.key === Qt.Key_F) {
+          root.toggleFpsCounter()
           event.accepted = true
         } else if (root.amigaActive() && event.key === Qt.Key_L) {
           root.toggleAmigaLoop()
@@ -509,11 +615,12 @@ Item {
         } else if (root.amigaActive() && event.key === Qt.Key_M) {
           root.toggleAmigaMute()
           event.accepted = true
-        } else if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal) {
-          root.cycleParallaxResolution(1)
+        } else if (event.key === Qt.Key_Plus || event.key === Qt.Key_Equal || event.key === Qt.Key_Asterisk) {
+          // Shift on + and - types another key on many layouts.
+          root.stepFpsLimit(root.fpsStep * (event.key === Qt.Key_Asterisk || (event.modifiers & Qt.ShiftModifier) ? 2 : 1))
           event.accepted = true
-        } else if (event.key === Qt.Key_Minus) {
-          root.cycleParallaxResolution(-1)
+        } else if (event.key === Qt.Key_Minus || event.key === Qt.Key_Underscore) {
+          root.stepFpsLimit(-root.fpsStep * (event.key === Qt.Key_Underscore || (event.modifiers & Qt.ShiftModifier) ? 2 : 1))
           event.accepted = true
         }
       }
@@ -719,8 +826,9 @@ Item {
                       // step coarser than 232x66 (cells x4/3, like desktop
                       // res 3->4): bigger glyphs, half the render work. Below
                       // 232 cols the wordmark falls back to fractional sampling.
-                      readonly property int fxCols: 174
-                      readonly property int fxRows: 50
+                      readonly property var fxLevel: root.previewLevels[root.previewLevel]
+                      readonly property int fxCols: fxLevel.cols
+                      readonly property int fxRows: fxLevel.rows
                       property bool subbed: false
                       property string subbedFx: ""
                       property string lastCells: ""
@@ -729,6 +837,11 @@ Item {
 
                       onFxNameChanged: {
                         if (subbed && subbedFx) { root.fxUnsub(subbedFx); subbed = false; subbedFx = "" }
+                        fxSync()
+                      }
+                      onFxLevelChanged: {
+                        if (subbed && subbedFx) { root.fxUnsub(subbedFx); subbed = false; subbedFx = "" }
+                        lastCells = ""
                         fxSync()
                       }
                       onVisibleChanged: {
@@ -740,7 +853,7 @@ Item {
                       function fxSync() {
                         if (visible && root.fxDaemonUp && fxName) {
                           if (!subbed) {
-                            root.fxSub(fxName, fxCols, fxRows)
+                            root.fxSub(fxName, fxCols, fxRows, fxLevel.fps)
                             subbed = true
                             subbedFx = fxName
                           }
@@ -792,6 +905,7 @@ Item {
                           ctx.fillRect(0, 0, width, height)
                           var data = fxLive.lastCells
                           if (!data) return
+                          var paintBegan = Date.now()
                           var cols = fxLive.fxCols, rows = fxLive.fxRows
                           // draw the grid slightly smaller than the box (same
                           // cell count, more breathing room around the band).
@@ -806,15 +920,16 @@ Item {
                           ctx.imageSmoothingEnabled=false
                           ctx.font="bold "+grid.font+"px monospace"
                           ctx.textBaseline = "alphabetic"
-                          var cells = data.split(";")
+                          ctx.globalAlpha=(fxLive.fxName==="matrix-reactive"||fxLive.fxName==="eye-reactive"||fxLive.fxName==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"].indexOf(fxLive.fxName)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
+                          var cells = data.split(";"), style = ""
                           for (var i = 0; i < cells.length; i++) {
                             var p = cells[i].split(",")
                             if (p.length < 4) continue
-                            ctx.fillStyle = p[3]
-                            ctx.globalAlpha=(fxLive.fxName==="matrix-reactive"||fxLive.fxName==="eye-reactive"||fxLive.fxName==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","city-rain","jellyfish","cockpit","hourglass","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"].indexOf(fxLive.fxName)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
+                            if (p[3] !== style) ctx.fillStyle = style = p[3]
                             if(p[2]==="█")ctx.fillRect(x0+parseInt(p[0])*cw,y0+parseInt(p[1])*chh,cw,chh)
                             else ctx.fillText(p[2], x0 + parseInt(p[0]) * cw, y0 + (parseInt(p[1]) + 0.82) * chh)
                           }
+                          root.notePreviewPaint(Date.now() - paintBegan)
                         }
                       }
                     }
@@ -930,6 +1045,23 @@ Item {
           color: root.categories[root.categoryIndex].color
           font.pixelSize: 12; font.bold: true; font.family: Style.font.display
           text: "⏎ apply"
+        }
+        Text {
+          visible: root.audioActive()
+          color: root.foreground
+          font.pixelSize: 12; font.family: Style.font.display
+          text: "↑ ↓ resolution " + root.resolutionLabel
+        }
+        Text {
+          visible: root.audioActive()
+          color: root.foreground
+          font.pixelSize: 12; font.family: Style.font.display
+          text: "+ − limit " + root.fpsLimit + " fps · shift ×2"
+        }
+        Text {
+          color: root.fpsCounter ? root.categories[root.categoryIndex].color : Util.alpha(root.foreground, 0.45)
+          font.pixelSize: 12; font.family: Style.font.display
+          text: "F fps " + (root.fpsCounter ? "on" : "off")
         }
         Text {
           color: (root.audioActive() || root.parallaxEnabled) ? root.foreground : Util.alpha(root.foreground, 0.4)
