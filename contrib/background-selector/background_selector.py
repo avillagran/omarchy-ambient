@@ -171,6 +171,8 @@ def main(args):
             run(AMBIENT,'screensaver','--set',item['source'],item.get('choice',''))
         else:apply('screensaver',item)
         return
+    if args==['--picking-for']:
+        print('screensaver' if for_screensaver() else 'background');return
     if args==['--current-category']:
         print(active_category());return
     if args==['current']:args=[active_category()]

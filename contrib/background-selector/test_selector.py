@@ -40,6 +40,11 @@ class Routing(unittest.TestCase):
    conf.write_text('fps=900\n');self.assertEqual(m.fps_limit('neon-city'),20)
    conf.write_text('fps=auto\n');self.assertEqual(m.fps_limit('neon-city'),20)
    m.set_fps_limit('neon-city',20);self.assertFalse(conf.exists())
+ def test_the_carousel_can_ask_what_it_is_choosing_for(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch('builtins.print') as say:
+   m.main(['--picking-for']);say.assert_called_with('background')
+   (Path(d)/'target').write_text('screensaver')
+   m.main(['--picking-for']);say.assert_called_with('screensaver')
  def test_fps_counter_toggles_a_flag_the_scenes_watch(self):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'FPS_COUNTER',Path(d)/'layer'/'show-fps') as flag:
    m.toggle_fps_counter();self.assertTrue(flag.exists())

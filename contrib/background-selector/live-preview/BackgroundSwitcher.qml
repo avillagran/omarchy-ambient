@@ -26,6 +26,8 @@ Item {
   property string ipcTarget: "io.github.avillagran.omarchy-animated-backgrounds"
   property string pluginDir: ""
 
+  // The same carousel chooses for the background or for the screensaver.
+  property bool pickingScreensaver: false
   property var categories: [ { id: "audio", label: "Screensaver", color: "#89dceb" } ]
   property int categoryIndex: 0
   property bool parallaxEnabled: true
@@ -388,6 +390,15 @@ Item {
   }
 
   Process {
+    id: pickingForRead
+    command: [root.home+"/.local/bin/omarchy-ambient-background-select","--picking-for"]
+    running: root.opened
+    stdout: StdioCollector {
+      onStreamFinished: root.pickingScreensaver=this.text.trim()==="screensaver"
+    }
+  }
+
+  Process {
     id: fpsCounterRead
     command: [root.home+"/.local/bin/omarchy-ambient-background-select","--fps-counter-get"]
     running: root.opened
@@ -651,7 +662,7 @@ Item {
 
             Text {
               anchors.centerIn: parent
-              text: catDelegate.modelData.label
+              text: root.pickingScreensaver ? "Screensaver" : "Background"
               color: catDelegate.active ? catDelegate.modelData.color : Util.alpha(root.foreground, 0.6)
               font.family: Style.font.display
               font.pixelSize: catDelegate.active ? 18 : 15
