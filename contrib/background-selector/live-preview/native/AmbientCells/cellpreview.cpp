@@ -7,6 +7,7 @@
 #include <QMetaObject>
 #include <QPainter>
 #include <QPainterPath>
+#include <QPolygonF>
 #include <QQmlExtensionPlugin>
 #include <QQuickPaintedItem>
 #include <QVariantMap>
@@ -17,6 +18,7 @@
 
 class CellPreview : public QQuickPaintedItem {
     Q_OBJECT
+    Q_PROPERTY(qreal skew READ skew WRITE setSkew NOTIFY skewChanged)
     Q_PROPERTY(QString cells READ cells WRITE setCells NOTIFY cellsChanged)
     Q_PROPERTY(QVariantMap metrics READ metrics WRITE setMetrics NOTIFY metricsChanged)
     Q_PROPERTY(qreal cellOpacity READ cellOpacity WRITE setCellOpacity NOTIFY cellOpacityChanged)
@@ -29,6 +31,11 @@ class CellPreview : public QQuickPaintedItem {
     static constexpr int MaxPaths = 4096;
     static constexpr int MaxMaskBytes = 8 * 1024 * 1024;
 
+    qreal m_skew = 0;
+    QImage m_leftMask, m_rightMask;
+    QSize m_maskSize;
+    qreal m_maskDpr = 0;
+    qreal m_maskSkew = 0;
     QString m_cells;
     QVariantMap m_metrics;
     qreal m_cellOpacity = 1;
@@ -44,6 +51,14 @@ public:
         setMipmap(false);
         setOpaquePainting(true);
         setFillColor(QColor());
+    }
+    qreal skew() const { return m_skew; }
+    void setSkew(qreal value) {
+        if (value == m_skew) return;
+        m_skew = value;
+        setOpaquePainting(value == 0);
+        emit skewChanged();
+        update();
     }
     QString cells() const { return m_cells; }
     QVariantMap metrics() const { return m_metrics; }
@@ -110,6 +125,7 @@ public:
     }
 
 signals:
+    void skewChanged();
     void cellsChanged();
     void metricsChanged();
     void cellOpacityChanged();
@@ -171,6 +187,45 @@ private:
             rects.push_back(rect);
         }
         flush();
+        // Only the edge strips contain transparency. Blending the whole frame
+        // here would replace the GPU saving with a large CPU cost.
+        if (m_skew != 0) {
+            const QSize physical(qCeil(width() * dpr), qCeil(height() * dpr));
+            if (m_maskSize != physical || m_maskDpr != dpr || m_maskSkew != m_skew) {
+                QImage mask(physical, QImage::Format_ARGB32_Premultiplied);
+                mask.setDevicePixelRatio(dpr);
+                mask.fill(Qt::transparent);
+                QPainter maskPainter(&mask);
+                maskPainter.setRenderHint(QPainter::Antialiasing, true);
+                maskPainter.setPen(Qt::NoPen);
+                maskPainter.setBrush(Qt::white);
+                const qreal k = qMin(std::abs(m_skew), width());
+                const qreal left = m_skew > 0 ? k : 0;
+                maskPainter.drawPolygon(QPolygonF{
+                    QPointF(left, 0), QPointF(width()-k+left, 0),
+                    QPointF(width()-left, height()), QPointF(k-left, height())
+                });
+                maskPainter.end();
+                const int strip = qMin(physical.width(), qCeil(k * dpr));
+                if (strip * 2 <= physical.width()) {
+                    m_leftMask = mask.copy(0, 0, strip, physical.height());
+                    m_rightMask = mask.copy(physical.width()-strip, 0, strip, physical.height());
+                } else {
+                    // Wide skews have overlapping strips: apply their mask once.
+                    m_leftMask = mask;
+                    m_rightMask = QImage();
+                }
+                m_maskSize = physical;
+                m_maskDpr = dpr;
+                m_maskSkew = m_skew;
+            }
+            p->setOpacity(1);
+            p->setCompositionMode(QPainter::CompositionMode_DestinationIn);
+            p->drawImage(QPointF(0,0), m_leftMask);
+            if (!m_rightMask.isNull())
+                p->drawImage(QPointF((physical.width()-m_rightMask.width()) / dpr, 0), m_rightMask);
+            p->setCompositionMode(QPainter::CompositionMode_SourceOver);
+        }
     }
 
     void paintGlyph(QPainter* p, const QFont& font, qreal dpr, const Cell& cell, qreal x, qreal baseline) {

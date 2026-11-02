@@ -765,7 +765,7 @@ Item {
                   // preview content (masked)
                   Item {
                     anchors.fill: parent
-                    layer.enabled: slice.visible
+                    layer.enabled: slice.visible && !(slice.selected && fxLive.nativeView)
                     layer.smooth: false
                     layer.effect: MultiEffect {
                       maskEnabled: true
@@ -779,7 +779,7 @@ Item {
                     Image {
                       id: staticPreview
                       anchors.fill: parent
-                      visible: true
+                      visible: !(slice.selected && fxLive.nativeView)
                       source: {
                         if (!slice.sourceActivated || !slice.itemData) return ""
                         return root.fileUrl(slice.itemData.preview)
@@ -879,12 +879,14 @@ Item {
                         try {
                           nativeView = Qt.createQmlObject('import QtQuick; import "' + Qt.resolvedUrl("native/AmbientCells")
                             + '" as Native; Native.CellPreview { anchors.fill: parent }', fxLive, "ambient-cells")
+                          nativeView.skew = root.skewOffset
                           root.previewNative = true
                           nativeView.painted.connect(function(ms) {
                             root.paintWindow += 1
                             root.notePreviewPaint(ms)
                           })
                         } catch (error) {
+                          if (nativeView) { nativeView.destroy(); nativeView = null }
                           root.nativePreviewUnavailable = true
                         }
                       }

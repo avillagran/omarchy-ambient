@@ -38,3 +38,47 @@ The tested variant is not installed permanently. M2 not tested in this round.
 
 Private harness, snapshots and redacted report: `/var/tmp/ambient-intel-round/`
 on the coordination host; `report.json` identifies the data and limitations.
+
+## Edge-mask composition round (2026-11-01)
+
+The native painter now applies the slice silhouette itself. It caches only
+left/right alpha strips (about 416 KiB at the tested size), then multiplies
+those strips into the frame. The opaque center needs no alpha-mask pass.
+The selected native preview bypasses the parent's offscreen layer and
+MultiEffect; static neighbors, non-native content and Canvas keep their masks.
+If creation fails after allocating an older native type, destroy that partial
+item so Canvas can become visible.
+
+A full-image CPU mask was rejected: GPU use fell, but shell CPU rose to about
+70–75%. Applying only the edge strips retained the GPU saving without that
+large CPU increase.
+
+Physical Intel ABBA against 406e18e, same paced producer, fixed 87x25/DPR 2,
+20 FPS requested; two six-second samples per variant per scene:
+
+| Scene | Measured CPU before → after | RC6 GPU estimate before → after |
+|---|---|---|
+| Neon City | 62.80% → 53.01% (−15.6%) | 59.70% → 29.60% |
+| Aquarium | 62.19% → 43.85% (−29.5%) | 61.82% → 29.95% |
+
+This round's CPU total **includes compositor CPU**, in addition to shell,
+producer, bridge and parec. It is not directly comparable to the preceding
+round's total, which excludes compositor. 100% still means one logical core.
+Received cadence stayed about 19–20 FPS. No watts/equilibrium claim: starting
+temperatures differ; interval peaks were 81–82 C before and 73–75 C after.
+
+One fixed-frame capture of the real masked preview, including title/border,
+was compared at 1536x950 physical pixels. The scene and corners match; 160
+pixels differ by at most 2/255 in the title label due to compositing rounding.
+This is not pixel-identity evidence for all content/transforms.
+
+Fresh automatic-mode checks for City and Aquarium both settled at level 2,
+about 19–20 FPS, with interval peaks 77 C and 76 C respectively. A fresh shell
+with an older native library lacking `skew` used Canvas and successfully saved
+its preview. Final source compiled on Intel with `-Wall -Wextra`; 14 selector
+tests pass. No M2 validation in this round.
+
+The installed renderer, plugin and preview bridge were restored after each
+trial; official Ambient 0.4.0 remains installed. Detailed samples, harness and
+redacted report: `/var/tmp/ambient-composition/report.json` on the coordination
+host. No source push or release.
