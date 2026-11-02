@@ -79,11 +79,23 @@ Item {
     { cols: 87, rows: 25, fps: 20 }
   ]
   readonly property int previewPaintBudgetMs: 40
+  // A native frame is cheap to paint at any size, so what counts is the share
+  // of a core the frame rate adds up to: a slow machine still has to step down.
+  readonly property real previewNativeShare: 0.35
+  readonly property real previewBudgetMs: root.previewNative
+    ? root.previewNativeShare * 1000 / root.previewLevels[root.previewLevel].fps
+    : root.previewPaintBudgetMs
+  property bool previewNative: false
   readonly property int previewSettlePaints: 6
   readonly property int previewSamplePaints: 12
   property int previewLevel: 0
   property real previewPaintMs: 0
   property var previewPaints: []
+  // Set once the native painter fails to load, so no slice tries it again.
+  property bool nativePreviewUnavailable: false
+  function cellAlpha(name) {
+    return (name==="matrix-reactive"||name==="eye-reactive"||name==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"].indexOf(name)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
+  }
   function notePreviewPaint(ms) {
     root.previewPaints.push(ms)
     var paints = root.previewPaints.slice(root.previewSettlePaints)
@@ -91,7 +103,7 @@ Item {
     paints.sort(function(a, b) { return a - b })
     root.previewPaintMs = paints[Math.floor(paints.length / 2)]
     root.previewPaints = []
-    if (root.previewPaintMs > root.previewPaintBudgetMs && root.previewLevel < root.previewLevels.length - 1)
+    if (root.previewPaintMs > root.previewBudgetMs && root.previewLevel < root.previewLevels.length - 1)
       root.previewLevel += 1
   }
 
@@ -732,7 +744,7 @@ Item {
                     id: maskShape
                     anchors.fill: parent
                     visible: false
-                    layer.enabled: true
+                    layer.enabled: slice.visible
 
                     Shape {
                       anchors.fill: parent
@@ -753,7 +765,7 @@ Item {
                   // preview content (masked)
                   Item {
                     anchors.fill: parent
-                    layer.enabled: true
+                    layer.enabled: slice.visible
                     layer.smooth: false
                     layer.effect: MultiEffect {
                       maskEnabled: true
@@ -794,7 +806,7 @@ Item {
                       // graphics backends composite video ABOVE the parent's
                       // masked layer, which would draw a rectangle over the
                       // slice shape
-                      layer.enabled: true
+                      layer.enabled: slice.visible
                       layer.smooth: false
                       layer.effect: MultiEffect {
                         maskEnabled: true
@@ -861,7 +873,35 @@ Item {
                         fxSync()
                       }
 
+                      property var nativeView: null
+                      function loadNativeView() {
+                        if (nativeView || root.nativePreviewUnavailable) return
+                        try {
+                          nativeView = Qt.createQmlObject('import QtQuick; import "' + Qt.resolvedUrl("native/AmbientCells")
+                            + '" as Native; Native.CellPreview { anchors.fill: parent }', fxLive, "ambient-cells")
+                          root.previewNative = true
+                          nativeView.painted.connect(function(ms) {
+                            root.paintWindow += 1
+                            root.notePreviewPaint(ms)
+                          })
+                        } catch (error) {
+                          root.nativePreviewUnavailable = true
+                        }
+                      }
+                      function showNative(cells) {
+                        var origin = fxLive.mapToItem(null, 0, 0)
+                        var dpr = fxCanvas.previewDpr
+                        var grid = PreviewGrid.metrics(width, height, fxCols, fxRows, dpr, origin.x, origin.y)
+                        root.activePreviewCanvas = nativeView
+                        if (root.pixelGrid.cw !== grid.pixelWidth || root.pixelGrid.ch !== grid.pixelHeight || root.pixelGrid.dpr !== dpr)
+                          root.pixelGrid = {cw:grid.pixelWidth,ch:grid.pixelHeight,dpr:dpr,cols:fxCols,rows:fxRows}
+                        nativeView.metrics = grid
+                        nativeView.cellOpacity = root.cellAlpha(fxName)
+                        nativeView.cells = cells
+                      }
+
                       function fxSync() {
+                        if (visible) loadNativeView()
                         if (visible && root.fxDaemonUp && fxName) {
                           if (!subbed) {
                             root.fxSub(fxName, fxCols, fxRows, fxLevel.fps)
@@ -898,12 +938,14 @@ Item {
                           if (d === fxLive.lastCells) return
                           fxLive.lastCells = d || ""
                           fxLive.lastFrameAt = Date.now()
-                          fxCanvas.requestPaint()
+                          if (fxLive.nativeView) fxLive.showNative(fxLive.lastCells)
+                          else fxCanvas.requestPaint()
                         }
                       }
 
                       Canvas {
                         id: fxCanvas
+                        visible: !fxLive.nativeView
                         smooth: false
                         antialiasing: false
                         property real previewDpr: Screen.devicePixelRatio
@@ -931,13 +973,17 @@ Item {
                           ctx.imageSmoothingEnabled=false
                           ctx.font="bold "+grid.font+"px monospace"
                           ctx.textBaseline = "alphabetic"
-                          ctx.globalAlpha=(fxLive.fxName==="matrix-reactive"||fxLive.fxName==="eye-reactive"||fxLive.fxName==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"].indexOf(fxLive.fxName)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
+                          ctx.globalAlpha=root.cellAlpha(fxLive.fxName)
                           var cells = data.split(";"), style = ""
                           for (var i = 0; i < cells.length; i++) {
                             var p = cells[i].split(",")
                             if (p.length < 4) continue
                             if (p[3] !== style) ctx.fillStyle = style = p[3]
+                            // Bars are most of a neon scene: a rectangle costs far less than a glyph.
                             if(p[2]==="█")ctx.fillRect(x0+parseInt(p[0])*cw,y0+parseInt(p[1])*chh,cw,chh)
+                            else if(p[2]==="▬")ctx.fillRect(x0+parseInt(p[0])*cw,y0+(parseInt(p[1])+0.36)*chh,cw,chh*0.28)
+                            else if(p[2]==="▌")ctx.fillRect(x0+parseInt(p[0])*cw,y0+parseInt(p[1])*chh,cw*0.5,chh)
+                            else if(p[2]==="▪")ctx.fillRect(x0+(parseInt(p[0])+0.3)*cw,y0+(parseInt(p[1])+0.38)*chh,cw*0.4,chh*0.24)
                             else ctx.fillText(p[2], x0 + parseInt(p[0]) * cw, y0 + (parseInt(p[1]) + 0.82) * chh)
                           }
                           root.notePreviewPaint(Date.now() - paintBegan)
@@ -972,7 +1018,9 @@ Item {
                       property real t: 0
                       x: (parent.width - width) / 2 + Math.sin(t) * width * 0.035
                       y: (parent.height - height) / 2 + Math.cos(t * 0.83) * height * 0.03
+                      // Every slice has one: running hidden, they would redraw the shell nonstop.
                       NumberAnimation on t {
+                        running: parallaxPreview.visible
                         from: 0; to: Math.PI * 2
                         duration: 6000; loops: Animation.Infinite
                       }

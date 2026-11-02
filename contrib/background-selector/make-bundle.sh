@@ -26,6 +26,19 @@ cp -r "$here/sources" "$here/posters" "$b/"
 mkdir -p "$b/plugin/v$version"
 cp -r "$here/live-preview/." "$b/plugin/v$version/"
 rm -f "$b/plugin/v$version/run-preview.py"
+# The native preview painter is optional: without it the carousel uses Canvas.
+native=$b/plugin/v$version/native/AmbientCells
+if qt=$(pkg-config --cflags --libs Qt6Quick Qt6Qml Qt6Gui 2>/dev/null) && [[ -x /usr/lib/qt6/moc ]]; then
+  # shellcheck disable=SC2086
+  /usr/lib/qt6/moc $(pkg-config --cflags Qt6Quick Qt6Qml Qt6Gui) "$native/cellpreview.cpp" -o "$native/cellpreview.moc"
+  # shellcheck disable=SC2086
+  g++ -O2 -std=c++17 -fPIC -shared -I"$native" "$native/cellpreview.cpp" -o "$native/libambientcells.so" $qt
+  strip "$native/libambientcells.so"
+else
+  echo "make-bundle: no Qt 6 development files, the bundle keeps the Canvas preview" >&2
+  rm -rf "$b/plugin/v$version/native"
+fi
+rm -f "$native/cellpreview.cpp" "$native/cellpreview.moc"
 mv "$b/plugin/v$version/manifest.json" "$b/plugin/"
 python3 -c '
 import json, sys
