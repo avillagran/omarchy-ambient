@@ -1,0 +1,1 @@
+6f9b0f7e591544b3608a3147baf51347538a8119fbd59ef480e32c0fd7815d7f  /home/intel/.local/share/omarchy-ambient/selector/omarchy-ttfx-layer

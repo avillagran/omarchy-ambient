@@ -1,0 +1,9 @@
+{
+  "bundle": "omarchy-ambient-bundle-x86_64.tar.gz",
+  "sha256": "93fe975d49b982553082abee15460b7c0ac6e5856ca23397e595aa5df305fe4b",
+  "version": "0.4.1-round-test",
+  "elf_machine": 62,
+  "renderer_sha256": "09440c1aabc79994e12eb78339cd62f88a43e68bff898f004e91048a49393fa6",
+  "native_sha256": "8eadb9048b4471fd32cb01d6f7ebcac4811c864257d47fa38a22aba3f62dc8f2",
+  "native_module": true
+}
