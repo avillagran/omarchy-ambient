@@ -48,7 +48,9 @@ omarchy-ambient stop                               # back to your wallpaper
 In the carousel, arrows left and right choose a scene and up and down change its
 resolution, live behind the carousel. Plus and minus set its frame rate limit, by
 10 or by 20 with Shift, and F shows the fps. Enter keeps it, Escape restores it.
-Scenes start at 20 fps and return to it on battery.
+Scenes find their own pace: they climb to what the machine affords, up to the
+display's refresh rate, and a machine with room to spare gets a finer grid from
+the next start. On battery they drop to 20 fps.
 
 One engine runs them all: every scene works as a background and as a screensaver.
 Every scene is drawn from text glyphs on the GPU, reacts to what is playing, and

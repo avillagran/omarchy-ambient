@@ -14,8 +14,11 @@ RESOLUTION_UNDO=CACHE/'resolution-undo.json'
 CONFIG=Path(os.environ.get('XDG_CONFIG_HOME') or H/'.config')/'omarchy/ambient'
 MAX_RESOLUTION_STEPS=4
 MIN_FPS,MAX_FPS=20,240
+# 0 stands for auto: the renderer picks the limit from what the machine affords.
+AUTO_FPS=0
+LAYER_CACHE=Path(os.environ.get('XDG_CACHE_HOME') or H/'.cache')/'omarchy-ttfx-layer'
 # Running scenes watch this file and draw their frame rate while it exists.
-FPS_COUNTER=Path(os.environ.get('XDG_CACHE_HOME') or H/'.cache')/'omarchy-ttfx-layer/show-fps'
+FPS_COUNTER=LAYER_CACHE/'show-fps'
 
 def run(*args):
     subprocess.run([str(x) for x in args],check=True)
@@ -81,12 +84,45 @@ def resolution_steps(source):
 def set_resolution_steps(source,steps):
     set_conf_value(source,'resolution',f'auto{steps:+d}' if steps else '')
 
+def parse_fps(value):
+    if value=='auto':return AUTO_FPS
+    return int(value) if value.isdigit() and MIN_FPS<=int(value)<=MAX_FPS else None
+
+def source_file(source,name):
+    return CONFIG/'sources'/source/name
+
+def default_fps(source):
+    path=source_file(source,'source.conf')
+    lines=path.read_text().splitlines() if path.exists() else []
+    values=[l.split('=',1)[1].strip() for l in lines if l.strip().startswith('fps=')]
+    fps=parse_fps(values[-1]) if values else None
+    return MIN_FPS if fps is None else fps
+
 def fps_limit(source):
-    value=conf_value(source,'fps')
-    return int(value) if value.isdigit() and MIN_FPS<=int(value)<=MAX_FPS else MIN_FPS
+    fps=parse_fps(conf_value(source,'fps'))
+    return default_fps(source) if fps is None else fps
 
 def set_fps_limit(source,fps):
-    set_conf_value(source,'fps',str(fps) if fps!=MIN_FPS else '')
+    value='' if fps==default_fps(source) else ('auto' if fps==AUTO_FPS else str(fps))
+    set_conf_value(source,'fps',value)
+
+def scene_name(source):
+    """The name the renderer keeps what it learned under, from the source's run script."""
+    path=source_file(source,'run')
+    words=path.read_text().split() if path.exists() else []
+    if '--neon-scene' in words[:-1]:return words[words.index('--neon-scene')+1]
+    for kind in ('eye','matrix','tunnel'):
+        if f'--interactive-{kind}' in words:return f'interactive-{kind}'
+    return None
+
+def learned(source):
+    """The limit and grid density the renderer settled on for this scene here, 0 when unknown."""
+    scene=scene_name(source)
+    values=[]
+    for kind in ('fps','density'):
+        try:values.append(int(float((LAYER_CACHE/f'{kind}-{scene}').read_text().strip())) if scene else 0)
+        except (OSError,ValueError):values.append(0)
+    return values
 
 def catalog_item(item_id):
     item=next((i for i in choices('screensaver') if i['id']==item_id),None)
@@ -103,7 +139,7 @@ def remember_for_undo(source):
 
 def store_tuning(item,steps,fps):
     set_resolution_steps(item['source'],max(-MAX_RESOLUTION_STEPS,min(MAX_RESOLUTION_STEPS,steps)))
-    set_fps_limit(item['source'],max(MIN_FPS,min(MAX_FPS,fps)))
+    set_fps_limit(item['source'],AUTO_FPS if fps==AUTO_FPS else max(MIN_FPS,min(MAX_FPS,fps)))
 
 def tune(item,steps,fps):
     remember_for_undo(item['source'])
@@ -153,7 +189,7 @@ def main(args):
         return
     if len(args)==2 and args[0]=='--tune-get':
         source=catalog_item(args[1])['source']
-        print(resolution_steps(source),fps_limit(source));return
+        print(resolution_steps(source),fps_limit(source),*learned(source));return
     if len(args)==4 and args[0]=='--tune':
         tune(catalog_item(args[1]),int(args[2]),int(args[3]));return
     if args==['--fps-counter']:

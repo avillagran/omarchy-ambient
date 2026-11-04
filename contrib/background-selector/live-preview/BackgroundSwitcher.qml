@@ -372,8 +372,16 @@ Item {
   readonly property int minFps: 20
   readonly property int maxFps: 240
   readonly property int fpsStep: 10
-  property int fpsLimit: minFps
-  readonly property string resolutionLabel: resolutionSteps === 0 ? "auto" : (resolutionSteps > 0 ? "+" : "") + resolutionSteps
+  // 0 is auto: the renderer climbs to what this machine affords, up to the
+  // display's rate, and learns how fine a grid it can draw there.
+  readonly property int autoFps: 0
+  property int fpsLimit: autoFps
+  property int learnedFps: 0
+  property int learnedDensity: 0
+  readonly property string resolutionLabel: resolutionSteps !== 0 ? (resolutionSteps > 0 ? "+" : "") + resolutionSteps
+    : "auto" + (fpsLimit === autoFps && learnedDensity > 0 ? " (+" + learnedDensity + ")" : "")
+  readonly property string fpsLabel: fpsLimit !== autoFps ? fpsLimit + " fps"
+    : "auto" + (learnedFps > 0 ? " (" + learnedFps + " fps)" : "")
   property bool fpsCounter: false
   function toggleFpsCounter() {
     root.fpsCounter=!root.fpsCounter
@@ -391,7 +399,11 @@ Item {
   function stepFpsLimit(delta) {
     const item=root.currentItems[root.selectedIndex]
     if (!item || item.type !== "audio") return
-    const next=Math.max(root.minFps,Math.min(root.maxFps,root.fpsLimit+delta))
+    // From auto the steps start at what auto reached; below the minimum is auto again.
+    const from=root.fpsLimit === root.autoFps ? (root.learnedFps || root.minFps) : root.fpsLimit
+    const wanted=from+delta
+    const next=root.fpsLimit !== root.autoFps && wanted < root.minFps ? root.autoFps
+      : Math.max(root.minFps,Math.min(root.maxFps,wanted))
     if (next === root.fpsLimit) return
     root.fpsLimit=next
     root.resolutionItem=item.path
@@ -410,7 +422,9 @@ Item {
     root.flushResolution()
     const item=root.currentItems[root.selectedIndex]
     root.resolutionSteps=0
-    root.fpsLimit=root.minFps
+    root.fpsLimit=root.autoFps
+    root.learnedFps=0
+    root.learnedDensity=0
     if (!item || item.type !== "audio") return
     resolutionRead.command=[root.home+"/.local/bin/omarchy-ambient-background-select","--tune-get",item.path]
     resolutionRead.running=true
@@ -571,7 +585,10 @@ Item {
         if (resolutionApplyTimer.running) return
         const tuning=this.text.trim().split(" ")
         root.resolutionSteps=parseInt(tuning[0])||0
-        root.fpsLimit=parseInt(tuning[1])||root.minFps
+        const fps=parseInt(tuning[1])
+        root.fpsLimit=isNaN(fps) ? root.autoFps : fps
+        root.learnedFps=parseInt(tuning[2])||0
+        root.learnedDensity=parseInt(tuning[3])||0
       }
     }
   }
@@ -1330,7 +1347,7 @@ Item {
           visible: root.audioActive()
           color: root.foreground
           font.pixelSize: 12; font.family: Style.font.display
-          text: "+ − limit " + root.fpsLimit + " fps · shift ×2"
+          text: "+ − limit " + root.fpsLabel + " · shift ×2"
         }
         Text {
           color: root.fpsCounter ? root.categories[root.categoryIndex].color : Util.alpha(root.foreground, 0.45)

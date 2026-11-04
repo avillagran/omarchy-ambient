@@ -32,14 +32,30 @@ class Routing(unittest.TestCase):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)/'c'),patch.object(m,'CACHE',Path(d)),patch.object(m,'RESOLUTION_UNDO',Path(d)/'undo'),patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'capture',return_value='none'),patch.object(m,'run') as run:
    (Path(d)/'target').write_text('screensaver')
    m.tune(item,1,30);m.revert_tuning();run.assert_not_called();self.assertEqual(m.resolution_steps('neon-city'),0)
- def test_fps_limit_only_takes_offered_values_and_twenty_needs_no_line(self):
+ def test_fps_limit_only_takes_offered_values_and_the_source_default_needs_no_line(self):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)):
    conf=Path(d)/'neon-city.conf'
-   self.assertEqual(m.fps_limit('neon-city'),20)
+   self.assertEqual(m.fps_limit('neon-city'),20,'without a source.conf the old default holds')
+   (Path(d)/'sources'/'neon-city').mkdir(parents=True)
+   (Path(d)/'sources'/'neon-city'/'source.conf').write_text('name=Neon City\nfps=auto\n')
+   self.assertEqual(m.fps_limit('neon-city'),m.AUTO_FPS)
    m.set_fps_limit('neon-city',140);self.assertEqual(conf.read_text(),'fps=140\n');self.assertEqual(m.fps_limit('neon-city'),140)
-   conf.write_text('fps=900\n');self.assertEqual(m.fps_limit('neon-city'),20)
-   conf.write_text('fps=auto\n');self.assertEqual(m.fps_limit('neon-city'),20)
-   m.set_fps_limit('neon-city',20);self.assertFalse(conf.exists())
+   conf.write_text('fps=900\n');self.assertEqual(m.fps_limit('neon-city'),m.AUTO_FPS)
+   m.set_fps_limit('neon-city',20);self.assertEqual(conf.read_text(),'fps=20\n','20 is a choice when auto is the default')
+   m.set_fps_limit('neon-city',m.AUTO_FPS);self.assertFalse(conf.exists())
+   (Path(d)/'sources'/'neon-city'/'source.conf').write_text('fps=20\n')
+   m.set_fps_limit('neon-city',m.AUTO_FPS);self.assertEqual(conf.read_text(),'fps=auto\n','auto is a choice when 20 is the default')
+ def test_the_carousel_shows_what_the_renderer_learned(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)),patch.object(m,'LAYER_CACHE',Path(d)/'layer'):
+   for source,run in [('neon-city','exec x --neon-scene neon-city --fps auto'),('eye-reactive','exec x --interactive-eye --fps auto'),('plain','exec x')]:
+    (Path(d)/'sources'/source).mkdir(parents=True);(Path(d)/'sources'/source/'run').write_text(run+'\n')
+   (Path(d)/'layer').mkdir()
+   (Path(d)/'layer'/'fps-neon-city').write_text('120\n');(Path(d)/'layer'/'density-neon-city').write_text('2\n')
+   (Path(d)/'layer'/'fps-interactive-eye').write_text('60\n')
+   self.assertEqual(m.learned('neon-city'),[120,2])
+   self.assertEqual(m.learned('eye-reactive'),[60,0])
+   self.assertEqual(m.learned('plain'),[0,0])
+   self.assertEqual(m.learned('missing'),[0,0])
  def test_the_carousel_can_ask_what_it_is_choosing_for(self):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch('builtins.print') as say:
    m.main(['--picking-for']);say.assert_called_with('background')

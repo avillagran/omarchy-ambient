@@ -93,8 +93,18 @@ The choice is one line per source, `resolution=auto+2`, in
 `screensaver` source share it.
 
 The plus and minus keys set the frame rate limit of the selected scene by 10,
-or by 20 with Shift, from 20, the default, to 240 fps: `fps=40` in the same
-file. The screen's refresh rate still has the last word. On battery every scene
-drops to 20 and returns to its limit on the charger.
+or by 20 with Shift, from 20 to 240 fps: `fps=40` in the same file. Below 20
+the limit goes back to auto, the default. In auto the renderer measures what a
+frame costs, in CPU and, where the kernel tells, in GPU, and climbs to the
+highest rate that stays within a quarter of one core and 30% of the GPU, never
+past the display's refresh rate. It remembers the rate per scene, so the next
+start begins there. A scene that holds the display's rate with room to spare is
+also remembered with a finer grid, which shows from its next start; the carousel
+shows both, as `auto (120 fps)` and `auto (+2)`. A resolution or limit chosen
+with the keys always wins. On battery every scene drops to 20 and returns to
+its limit on the charger.
+
+The `screensaver` source keeps 20 fps: its TTFx effects move one step per
+frame, so an automatic limit would change their speed.
 
 F shows or hides the frame rate on every running scene, without restarting it.
