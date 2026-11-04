@@ -64,6 +64,7 @@ Item {
   property var pixelGrid: ({})
   property var activePreviewCanvas: null
   property bool fxDaemonUp: false
+  readonly property bool fxWanted: root.opened && root.categories[root.categoryIndex].id === "audio"
   property int fxFramesRcvd: 0
   property string fxLastErr: ""
   property int fxLinesSeen: 0
@@ -73,10 +74,13 @@ Item {
 
   // Live previews repaint every cell from JavaScript, so a slow machine trades
   // grid and frame rate for smoothness. A fast one never leaves the first level.
+  // cols is a target: the slice decides the rows and the exact grid.
   readonly property var previewLevels: [
-    { cols: 174, rows: 50, fps: 60 },
-    { cols: 116, rows: 33, fps: 30 },
-    { cols: 87, rows: 25, fps: 20 }
+    { cols: 232, fps: 30 },
+    { cols: 174, fps: 30 },
+    { cols: 116, fps: 30 },
+    { cols: 116, fps: 20 },
+    { cols: 87, fps: 20 }
   ]
   readonly property int previewPaintBudgetMs: 40
   // A native frame is cheap to paint at any size, so what counts is the share
@@ -88,27 +92,163 @@ Item {
   property bool previewNative: false
   readonly property int previewSettlePaints: 6
   readonly property int previewSamplePaints: 12
-  property int previewLevel: 0
+  // The finest level is only for native painting; Canvas starts one below.
+  property int previewLevel: 1
+  // The finest level that has run within budget; a level that failed is not retried.
+  property int previewCeiling: 0
   property real previewPaintMs: 0
   property var previewPaints: []
   // Set once the native painter fails to load, so no slice tries it again.
   property bool nativePreviewUnavailable: false
+  // The live preview is painted in its own small surface over the selected
+  // slice: a frame then redraws that rectangle, not the whole carousel window.
+  property var liveNative: null
+  property rect liveNativeRect: Qt.rect(0, 0, 0, 0)
+  // The daemon's output read natively: frames reach the native view without
+  // a line parser and a JavaScript call each. Without the module, fxDaemon runs.
+  property var fxStream: null
+  readonly property bool fxRunning: fxStream ? fxStream.running : fxDaemon.running
+  readonly property int fxProcessId: fxStream ? fxStream.processId : fxDaemon.processId
+  function fxWrite(text) { if (fxStream) fxStream.write(text); else fxDaemon.write(text) }
+  function fxStreamRunning(running) {
+    root.fxDaemonUp = running
+    if (!running) root.fxCells = ({})
+  }
+  Component.onCompleted: {
+    try {
+      var stream = Qt.createQmlObject('import QtQuick; import "' + Qt.resolvedUrl("native/AmbientCells")
+        + '" as Native; Native.PreviewStream {}', root, "ambient-stream")
+      stream.command = fxDaemon.command
+      stream.sink = Qt.binding(function() { return root.nativeSink ? root.nativeSink.nativeView : null })
+      stream.sinkEffect = Qt.binding(function() { return root.nativeSink ? root.nativeSink.fxName : "" })
+      stream.runningChanged.connect(function() { root.fxStreamRunning(stream.running) })
+      stream.line.connect(root.fxLine)
+      stream.frame.connect(root.fxFrame)
+      root.fxStream = stream
+      stream.running = Qt.binding(function() { return root.fxWanted })
+    } catch (error) {
+      root.fxStream = null
+    }
+  }
+  function sharedNativeView() {
+    if (root.liveNative || root.nativePreviewUnavailable) return root.liveNative
+    try {
+      root.liveNative = Qt.createQmlObject('import QtQuick; import "' + Qt.resolvedUrl("native/AmbientCells")
+        + '" as Native; Native.CellPreview { anchors.fill: parent }', livePreviewHost, "ambient-cells")
+      root.liveNative.skew = root.skewOffset
+      root.previewNative = true
+      if (root.previewLevel === 1 && root.previewPaints.length === 0) root.previewLevel = 0
+      root.liveNative.painted.connect(function(ms) {
+        root.paintWindow += 1
+        root.notePreviewPaint(ms)
+      })
+    } catch (error) {
+      if (root.liveNative) { root.liveNative.destroy(); root.liveNative = null }
+      root.nativePreviewUnavailable = true
+    }
+    return root.liveNative
+  }
   function cellAlpha(name) {
     return (name==="matrix-reactive"||name==="eye-reactive"||name==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"].indexOf(name)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
   }
+  // What the open carousel really costs: this shell and the preview daemon, as
+  // a share of one core. Where /proc can be read this picks the level; paint
+  // time alone misses the render thread and the daemon, most of the bill.
+  readonly property real previewCpuBudget: 0.5
+  property real previewCpu: -1
+  property var previewCpuLast: null
+  property int previewCpuSettle: 0
+  FileView { id: shellStat; path: "/proc/self/stat"; blockLoading: true }
+  FileView { id: daemonChildren; blockLoading: true
+    path: root.fxProcessId ? "/proc/" + root.fxProcessId + "/task/" + root.fxProcessId + "/children" : "" }
+  FileView { id: daemonStat; blockLoading: true }
+  function statTicks(text) {
+    var fields = String(text || "").slice(String(text || "").lastIndexOf(")") + 2).split(" ")
+    return fields.length > 13 ? Number(fields[11]) + Number(fields[12]) : NaN
+  }
+  function samplePreviewCpu() {
+    shellStat.reload()
+    var ticks = statTicks(shellStat.text())
+    daemonChildren.reload()
+    var children = String(daemonChildren.text() || "").trim().split(" ").filter(function(pid) { return pid !== "" })
+    for (var i = 0; i < children.length; i++) {
+      daemonStat.path = "/proc/" + children[i] + "/stat"
+      daemonStat.reload()
+      ticks += statTicks(daemonStat.text())
+    }
+    var now = Date.now(), last = root.previewCpuLast
+    root.previewCpuLast = {at: now, ticks: ticks}
+    if (!last || isNaN(ticks) || isNaN(last.ticks) || now <= last.at) return
+    root.previewCpu = (ticks - last.ticks) / 100 / ((now - last.at) / 1000)
+    if (root.previewCpuSettle > 0) { root.previewCpuSettle -= 1; return }
+    if (root.previewCpu > root.previewCpuBudget && root.previewLevel < root.previewLevels.length - 1) {
+      root.previewLevel += 1
+      root.previewCeiling = root.previewLevel
+      root.previewCpuSettle = 2
+    } else if (root.previewCpu * 2 < root.previewCpuBudget && root.previewLevel > root.previewCeiling) {
+      root.previewLevel -= 1
+      root.previewCpuSettle = 2
+    }
+  }
+  Timer {
+    interval: 2000; repeat: true
+    running: root.opened && root.fxDaemonUp
+    onRunningChanged: if (running) { root.previewCpuLast = null; root.previewCpuSettle = 1 }
+    onTriggered: root.samplePreviewCpu()
+  }
+
   function notePreviewPaint(ms) {
     root.previewPaints.push(ms)
-    var paints = root.previewPaints.slice(root.previewSettlePaints)
+    // Native glyphs are rasterized on first use, so its first frames run slow.
+    var settle = root.previewNative ? root.previewSettlePaints * 3 : root.previewSettlePaints
+    var paints = root.previewPaints.slice(settle)
     if (paints.length < root.previewSamplePaints) return
     paints.sort(function(a, b) { return a - b })
     root.previewPaintMs = paints[Math.floor(paints.length / 2)]
     root.previewPaints = []
-    if (root.previewPaintMs > root.previewBudgetMs && root.previewLevel < root.previewLevels.length - 1)
+    // Once the real CPU share is known it decides; paint time only reports.
+    if (root.previewCpu >= 0) return
+    // Native painting costs about the same at any grid on a dense screen, so
+    // below 174x50 it only steps down when frames are actually being dropped.
+    var keepingUp = root.paintFps >= root.previewLevels[root.previewLevel].fps * 0.8
+    var floor = root.previewNative && keepingUp ? 1 : root.previewLevels.length - 1
+    if (root.previewPaintMs > root.previewBudgetMs && root.previewLevel < floor) {
       root.previewLevel += 1
+      root.previewCeiling = root.previewLevel
+    } else if (root.previewNative && root.previewLevel > root.previewCeiling) {
+      // Native cost is mostly filling the view, not the cells: with half the
+      // budget left the finer grid fits, and if not it steps back once for good.
+      var up = root.previewLevels[root.previewLevel - 1]
+      if (root.previewPaintMs < root.previewNativeShare * 1000 / up.fps * 0.5) root.previewLevel -= 1
+    }
+  }
+
+  // The slice whose native view takes raw daemon lines for its effect.
+  property var nativeSink: null
+  // A frame the native stream gave the sink; the rest of what fxLine does for one.
+  function fxFrame(volume) {
+    root.fxLinesSeen += 1
+    root.fxLastErr = ""
+    root.fxFramesRcvd += 1
+    root.receivedWindow += 1
+    root.fxVolume = volume
+    if (root.nativeSink) root.nativeSink.frameTaken()
   }
 
   function fxLine(line) {
     root.fxLinesSeen += 1
+    var sink = root.nativeSink
+    // The native view takes runs or plain cells; the Canvas only plain cells.
+    if (sink && sink.fxName && (line.startsWith('{"fx":"' + sink.fxName + '","runs":"')
+        || line.startsWith('{"fx":"' + sink.fxName + '","cells":"'))) {
+      root.fxLastErr = ""
+      root.fxFramesRcvd += 1
+      root.receivedWindow += 1
+      var at = line.lastIndexOf('"volume":')
+      root.fxVolume = at > 0 ? (parseFloat(line.slice(at + 9)) || 0) : 0
+      sink.takeLine(line)
+      return
+    }
     var d
     try { d = JSON.parse(line) } catch (e) {
       root.fxLastErr = line.substring(0, 60)
@@ -128,15 +268,18 @@ Item {
     }
   }
 
-  function fxSub(fx, cols, rows, fps) {
+  function fxSub(fx, cols, rows, fps, runs) {
     root.fxSubCount += 1
-    if (!fxDaemon.running) return
-    fxDaemon.write(JSON.stringify({ cmd: "sub", fx: fx, cols: cols, rows: rows, fps: fps }) + "\n")
+    if (!root.fxRunning) return
+    // Runs carry the same cells in about a third of the text; older daemons ignore the format.
+    var sub = { cmd: "sub", fx: fx, cols: cols, rows: rows, fps: fps }
+    if (runs) sub.format = "runs"
+    root.fxWrite(JSON.stringify(sub) + "\n")
   }
 
   function fxUnsub(fx) {
-    if (!fxDaemon.running) return
-    fxDaemon.write(JSON.stringify({ cmd: "unsub", fx: fx }) + "\n")
+    if (!root.fxRunning) return
+    root.fxWrite(JSON.stringify({ cmd: "unsub", fx: fx }) + "\n")
   }
 
   property string originalType: ""
@@ -358,8 +501,9 @@ Item {
     id: fxDaemon
     command: ["python3",home+"/.local/share/omarchy-ambient/selector/run-preview.py"]
     stdinEnabled: true
-    running: root.opened && root.categories[root.categoryIndex].id === "audio"
+    running: root.fxWanted && !root.fxStream
     onRunningChanged: {
+      if (root.fxStream) return
       if (running) {
         root.fxDaemonUp = true
       } else {
@@ -583,6 +727,46 @@ Item {
 
   // ------------------------------------------------------------------ layer
   PanelWindow {
+    id: livePreviewWindow
+    screen: panel.screen
+    // Shown once the selected effect has drawn a frame: until then the slice
+    // keeps its poster, so switching never shows the desktop through it.
+    visible: root.opened && !!root.liveNative && !!root.nativeSink && root.nativeSink.lastCells !== ""
+      && root.liveNativeRect.width > 0
+    color: "transparent"
+    anchors { top: true; left: true }
+    margins { left: root.liveNativeRect.x; top: root.liveNativeRect.y }
+    implicitWidth: Math.max(1, root.liveNativeRect.width)
+    implicitHeight: Math.max(1, root.liveNativeRect.height)
+    WlrLayershell.namespace: "omarchy-ambient-selector-live"
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
+    exclusionMode: ExclusionMode.Ignore
+    // Clicks go through to the carousel underneath.
+    mask: Region {}
+    Item { id: livePreviewHost; anchors.fill: parent }
+    // The slice's own stroke is under this window: draw it again on top.
+    Shape {
+      id: liveStroke
+      anchors.fill: parent
+      antialiasing: true
+      preferredRendererType: Shape.CurveRenderer
+      readonly property real k: Math.abs(root.skewOffset)
+      readonly property bool leansRight: root.skewOffset >= 0
+      ShapePath {
+        fillColor: "transparent"
+        strokeColor: root.selectedBorder
+        strokeWidth: 3
+        startX: liveStroke.leansRight ? liveStroke.k : 0; startY: 0
+        PathLine { x: liveStroke.leansRight ? liveStroke.width : liveStroke.width - liveStroke.k; y: 0 }
+        PathLine { x: liveStroke.leansRight ? liveStroke.width - liveStroke.k : liveStroke.width; y: liveStroke.height }
+        PathLine { x: liveStroke.leansRight ? 0 : liveStroke.k; y: liveStroke.height }
+        PathLine { x: liveStroke.leansRight ? liveStroke.k : 0; y: 0 }
+      }
+    }
+  }
+
+  PanelWindow {
     id: panel
     visible: root.opened
     color: "transparent"
@@ -765,7 +949,9 @@ Item {
                   // preview content (masked)
                   Item {
                     anchors.fill: parent
-                    layer.enabled: slice.visible && !(slice.selected && fxLive.nativeView)
+                    // The live window fades in and out over this: the poster under it
+                    // stays, so the slice is never see-through while it does.
+                    layer.enabled: slice.visible
                     layer.smooth: false
                     layer.effect: MultiEffect {
                       maskEnabled: true
@@ -779,7 +965,6 @@ Item {
                     Image {
                       id: staticPreview
                       anchors.fill: parent
-                      visible: !(slice.selected && fxLive.nativeView)
                       source: {
                         if (!slice.sourceActivated || !slice.itemData) return ""
                         return root.fileUrl(slice.itemData.preview)
@@ -845,13 +1030,15 @@ Item {
 
                       // single shared grid — every slice for the same effect
                       // consumes one session, so resizing per-slice would
-                      // desync the collapsed copies. 174x50 is one resolution
-                      // step coarser than 232x66 (cells x4/3, like desktop
-                      // res 3->4): bigger glyphs, half the render work. Below
-                      // 232 cols the wordmark falls back to fractional sampling.
+                      // desync the collapsed copies. A level names the columns
+                      // it aims for; the expanded slice's size gives the grid
+                      // that covers it in whole cells.
                       readonly property var fxLevel: root.previewLevels[root.previewLevel]
-                      readonly property int fxCols: fxLevel.cols
-                      readonly property int fxRows: fxLevel.rows
+                      readonly property real fxDpr: Screen.devicePixelRatio
+                      readonly property var fxGrid: PreviewGrid.cover(root.expandedWidth, root.expandedHeight, fxLevel.cols, fxDpr)
+                      readonly property int fxCols: fxGrid.cols
+                      readonly property int fxRows: fxGrid.rows
+                      readonly property string fxSession: fxCols + "x" + fxRows + "@" + fxLevel.fps
                       property bool subbed: false
                       property string subbedFx: ""
                       property string lastCells: ""
@@ -860,14 +1047,17 @@ Item {
 
                       onFxNameChanged: {
                         if (subbed && subbedFx) { root.fxUnsub(subbedFx); subbed = false; subbedFx = "" }
+                        lastCells = ""
                         fxSync()
                       }
-                      onFxLevelChanged: {
+                      onFxSessionChanged: {
                         if (subbed && subbedFx) { root.fxUnsub(subbedFx); subbed = false; subbedFx = "" }
                         lastCells = ""
                         fxSync()
                       }
                       onVisibleChanged: {
+                        if (visible && nativeView) root.nativeSink = fxLive
+                        else if (!visible && root.nativeSink === fxLive) root.nativeSink = null
                         root.fxVisCount += visible ? 1 : -1
                         if (!visible) lastCells = ""
                         fxSync()
@@ -876,29 +1066,36 @@ Item {
                       property var nativeView: null
                       function loadNativeView() {
                         if (nativeView || root.nativePreviewUnavailable) return
-                        try {
-                          nativeView = Qt.createQmlObject('import QtQuick; import "' + Qt.resolvedUrl("native/AmbientCells")
-                            + '" as Native; Native.CellPreview { anchors.fill: parent }', fxLive, "ambient-cells")
-                          nativeView.skew = root.skewOffset
-                          root.previewNative = true
-                          nativeView.painted.connect(function(ms) {
-                            root.paintWindow += 1
-                            root.notePreviewPaint(ms)
-                          })
-                        } catch (error) {
-                          if (nativeView) { nativeView.destroy(); nativeView = null }
-                          root.nativePreviewUnavailable = true
-                        }
+                        nativeView = root.sharedNativeView()
+                        if (nativeView && fxLive.visible) root.nativeSink = fxLive
                       }
-                      function showNative(cells) {
+                      function frameTaken() {
+                        lastFrameAt = Date.now()
+                        lastCells = "native"
+                        prepareNative()
+                      }
+                      function takeLine(line) {
+                        lastFrameAt = Date.now()
+                        lastCells = "native"
+                        prepareNative()
+                        nativeView.setFrameLine(line)
+                      }
+                      function prepareNative() {
                         var origin = fxLive.mapToItem(null, 0, 0)
+                        var rect = Qt.rect(Math.round(origin.x), Math.round(origin.y), Math.round(width), Math.round(height))
+                        if (rect.x !== root.liveNativeRect.x || rect.y !== root.liveNativeRect.y
+                            || rect.width !== root.liveNativeRect.width || rect.height !== root.liveNativeRect.height)
+                          root.liveNativeRect = rect
                         var dpr = fxCanvas.previewDpr
-                        var grid = PreviewGrid.metrics(width, height, fxCols, fxRows, dpr, origin.x, origin.y)
+                        var grid = PreviewGrid.metrics(rect.width, rect.height, fxCols, fxRows, dpr, rect.x, rect.y)
                         root.activePreviewCanvas = nativeView
                         if (root.pixelGrid.cw !== grid.pixelWidth || root.pixelGrid.ch !== grid.pixelHeight || root.pixelGrid.dpr !== dpr)
                           root.pixelGrid = {cw:grid.pixelWidth,ch:grid.pixelHeight,dpr:dpr,cols:fxCols,rows:fxRows}
                         nativeView.metrics = grid
                         nativeView.cellOpacity = root.cellAlpha(fxName)
+                      }
+                      function showNative(cells) {
+                        prepareNative()
                         nativeView.cells = cells
                       }
 
@@ -906,7 +1103,7 @@ Item {
                         if (visible) loadNativeView()
                         if (visible && root.fxDaemonUp && fxName) {
                           if (!subbed) {
-                            root.fxSub(fxName, fxCols, fxRows, fxLevel.fps)
+                            root.fxSub(fxName, fxCols, fxRows, fxLevel.fps, !!nativeView)
                             subbed = true
                             subbedFx = fxName
                           }
@@ -918,7 +1115,10 @@ Item {
                       }
 
                       Component.onCompleted: fxSync()
-                      Component.onDestruction: if (subbed && subbedFx) root.fxUnsub(subbedFx)
+                      Component.onDestruction: {
+                        if (root.nativeSink === fxLive) root.nativeSink = null
+                        if (subbed && subbedFx) root.fxUnsub(subbedFx)
+                      }
 
                       Connections {
                         target: root

@@ -1,0 +1,6 @@
+<RCC>
+  <qresource prefix="/ambientcells">
+    <file>cells.vert.qsb</file>
+    <file>cells.frag.qsb</file>
+  </qresource>
+</RCC>

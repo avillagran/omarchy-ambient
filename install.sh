@@ -233,6 +233,18 @@ if command -v omarchy-plugin-enable >/dev/null; then
   done
 fi
 $enabled || say "Enable the plugin by hand: omarchy-plugin-enable $plugin_id"
+# A shell that already ran the selector keeps the old one until it reloads it.
+if $enabled; then
+  for _ in {1..10}; do
+    [[ $(omarchy-shell "$plugin_id" version 2>/dev/null) == "$(<"$b/VERSION")" ]] && break
+    sleep 0.5
+  done
+  if [[ $(omarchy-shell "$plugin_id" version 2>/dev/null) != "$(<"$b/VERSION")" ]] &&
+    command -v omarchy-restart-shell >/dev/null; then
+    say "Restarting the Omarchy shell so it loads the new selector."
+    omarchy-restart-shell >/dev/null 2>&1 || say "Restart the shell by hand: omarchy-restart-shell"
+  fi
+fi
 if $first && [[ $("$bindir/omarchy-ambient" installed 2>/dev/null) != "menu=yes idle=yes" ]]; then
   : >"$selector/added-menu"
 fi

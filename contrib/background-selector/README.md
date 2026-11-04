@@ -1,6 +1,6 @@
 # Background selector example
 
-A selector for Omarchy's Style > Background menu, built on Ambient. It offers four
+A selector for Omarchy's Appearance > Background menu, built on Ambient. It offers four
 entries: **Theme**, **Screensaver**, **Amiga Demos** and **Random**. Random picks one
 category and one item per activation, with no timer. Applying always goes through
 `omarchy-ambient`, so its lifecycle, visibility and battery rules stay in charge.
@@ -23,6 +23,33 @@ alias of `screensaver`, and `omarchy-ambient-background-select` is an alias of t
 The `install.sh` at the top of this repository installs all of this for the current
 user. It downloads a release bundle, which `make-bundle.sh` builds from this directory
 and an `omarchy-ttfx-layer` binary with `--neon-scene`.
+
+## Build a bundle
+
+Build on each target architecture with an `omarchy-ttfx-layer` renderer built with
+`cargo build --release --frozen --no-default-features`. The bundle also builds the
+Ambient layer and dismiss helper, so it needs a C compiler, Make, `pkg-config`,
+Wayland development files and `wayland-protocols`.
+
+The GPU preview additionally needs a C++17 compiler, the Qt 6 Quick, QML and GUI
+development files, and Qt Shader Tools (`qt6-shadertools` on Arch). The builder
+looks for `/usr/lib/qt6/moc`, `/usr/lib/qt6/rcc` and `/usr/lib/qt6/bin/qsb`.
+`qsb` bakes the vertex and fragment shaders; `rcc` embeds both in
+`libambientcells.so`, so the installed plugin needs no shader compiler.
+
+From the repository root:
+
+```sh
+contrib/background-selector/make-bundle.sh /path/to/omarchy-ttfx-layer VERSION out/
+tar -tzf "out/omarchy-ambient-bundle-$(uname -m).tar.gz" \
+  | grep -F /native/AmbientCells/libambientcells.so
+```
+
+The native module is optional: if its Qt development files or shader tools are
+missing, the builder prints a warning and produces a working Canvas fallback.
+For a release intended to include the GPU preview, require the archive check
+above to pass for both architecture bundles. A successful bundle build by itself
+does not establish that the native preview was included.
 
 ## Notes
 

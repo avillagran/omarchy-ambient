@@ -3,7 +3,9 @@
 
 source "$(dirname "$0")/lib.sh"
 
-for name in socat parec inotifywait omarchy-shell omarchy-plugin-disable; do stub "$name" 'exit 0'; done
+for name in socat parec inotifywait omarchy-plugin-disable; do stub "$name" 'exit 0'; done
+stub omarchy-shell '[[ $2 == version ]] && echo "${AMBIENT_TEST_SELECTOR_VERSION:-9.9.9}"; exit 0'
+stub omarchy-restart-shell 'echo restart >>"$HOME/selector-restarts"'
 # As on a live shell: unknown until the rescan has been picked up.
 stub omarchy-plugin-enable "n=\$(cat '$scratch/tries' 2>/dev/null || echo 0); echo \$((n + 1)) >'$scratch/tries'; ((n >= 2))"
 monitors '[]'
@@ -37,6 +39,7 @@ assert "the plugin is in place" test -x "$XDG_CONFIG_HOME/omarchy/plugins/avilla
 assert "the poster is in the cache" test -f "$HOME/.cache/omarchy/ambient-selector/demo.jpg"
 assert "the command is on the path" test -x "$HOME/.local/bin/omarchy-ambient"
 assert "the selector command is on the path" test -x "$HOME/.local/bin/omarchy-ambient-select"
+assert "a shell on this version needs no restart" test ! -e "$HOME/selector-restarts"
 assert_eq "the old name is an alias" "$(readlink "$HOME/.local/bin/omarchy-ambient-background-select")" omarchy-ambient-select
 assert_eq "it waits for the shell to know the plugin" "$(cat "$scratch/tries")" 3
 assert_eq "scenes keep running on battery" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=run"
@@ -52,6 +55,11 @@ running=$!
 assert "it installs again" bash "$install_sh"
 kill "$running"
 assert_eq "a second run keeps the user's settings" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=pause"
+
+export AMBIENT_TEST_SELECTOR_VERSION=old
+assert "an older running selector requests a shell restart" bash "$install_sh"
+unset AMBIENT_TEST_SELECTOR_VERSION
+assert_eq "the restart stays inside the fixture" "$(cat "$HOME/selector-restarts")" restart
 
 mkdir -p "$b/sources/other"
 printf 'name=Other\n' >"$b/sources/other/source.conf"

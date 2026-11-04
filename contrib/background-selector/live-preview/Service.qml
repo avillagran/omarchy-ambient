@@ -11,6 +11,9 @@ Item {
   function select(effect: string): void { for(var i=0;i<switcher.currentItems.length;i++) if(switcher.currentItems[i].path===effect) {switcher.selectedIndex=i;return;} }
   function savePreview(path: string): bool { return switcher.activePreviewCanvas ? switcher.activePreviewCanvas.save(path) : false }
   function close(): void { switcher.close(true) }
-  function state(): string { return JSON.stringify({opened:switcher.opened,items:switcher.currentItems.length,selected:switcher.currentItems[switcher.selectedIndex],frames:switcher.fxFramesRcvd,receivedFps:switcher.receivedFps,paintFps:switcher.paintFps,previewLevel:switcher.previewLevel,resolutionSteps:switcher.resolutionSteps,fpsCounter:switcher.fpsCounter,fpsLimit:switcher.fpsLimit,pickingScreensaver:switcher.pickingScreensaver,nativePreview:!!(switcher.activePreviewCanvas&&switcher.activePreviewCanvas.cellOpacity!==undefined),previewPaintMs:switcher.previewPaintMs,pixelGrid:switcher.pixelGrid,daemon:switcher.fxDaemonUp,error:switcher.fxLastErr}) }
+  // Each release loads from its own v<version> directory: the installer asks
+  // this to know the running shell picked the new one up.
+  function version(): string { return root.pluginDir.split("/").pop().replace(/^v/, "") }
+  function state(): string { return JSON.stringify({opened:switcher.opened,items:switcher.currentItems.length,selected:switcher.currentItems[switcher.selectedIndex],frames:switcher.fxFramesRcvd,receivedFps:switcher.receivedFps,paintFps:switcher.paintFps,previewLevel:switcher.previewLevel,resolutionSteps:switcher.resolutionSteps,fpsCounter:switcher.fpsCounter,fpsLimit:switcher.fpsLimit,pickingScreensaver:switcher.pickingScreensaver,previewCpu:switcher.previewCpu,nativePreview:!!(switcher.activePreviewCanvas&&switcher.activePreviewCanvas.cellOpacity!==undefined),previewPaintMs:switcher.previewPaintMs,pixelGrid:switcher.pixelGrid,daemon:switcher.fxDaemonUp,error:switcher.fxLastErr}) }
  }
 }
