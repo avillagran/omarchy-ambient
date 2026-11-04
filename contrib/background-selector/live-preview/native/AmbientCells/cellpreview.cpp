@@ -173,6 +173,9 @@ private:
 } // namespace
 
 class CellPreview : public QQuickItem {
+#ifdef AMBIENT_CELLS_TEST
+    friend struct CellPreviewTest;
+#endif
     Q_OBJECT
     Q_PROPERTY(qreal skew READ skew WRITE setSkew NOTIFY skewChanged)
     Q_PROPERTY(QString cells READ cells WRITE setCells NOTIFY cellsChanged)

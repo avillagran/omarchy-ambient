@@ -62,7 +62,23 @@ does not establish that the native preview was included.
 
 ## Tests
 
-    python3 contrib/background-selector/test_selector.py
+```sh
+python3 contrib/background-selector/test_selector.py
+bash contrib/background-selector/tests/native-preview-test.sh
+```
+
+The native harness compiles the real `CellPreview` implementation with a test-only
+friend and runs with Qt's offscreen platform. It needs a C++17 compiler, Qt 6
+Quick/QML/GUI development files, `pkg-config` and `moc`; it does not open a window,
+run the shell or preview daemon, or read or change installed files.
+
+It checks 32,000 independently generated cells through the plain cells, JSON
+cells and JSON runs parsers, including Unicode, protocol escapes, malformed
+records and recovery between effects. It also compares 18 CPU snapshot/save
+pairs at fractional metrics, DPR 1/1.5/2, two opacities and three skews. These are
+parser and CPU snapshot checks, not GPU equivalence or performance measurements.
+The legacy cells format uses comma and semicolon as delimiters; those characters
+are tested as glyphs in the counted runs format instead.
 
 ## Resolution
 
