@@ -70,7 +70,7 @@ Los tiempos de etapa y el coste por cuadro dependen de la frecuencia y de los cu
 ## Validación y preparación
 
 - Renderer integrado:234 pruebas principales, biblioteca/puente/grupos aislados y11 pruebasGPU pasan en M2; la misma suite y los11 gatesGPU también pasaron en Intel con el candidato final.
-- Selector: suite215 aserciones, instalador52, Python14; harness reproducible32000celdas×3rutas del parser y18 pares CPU/snapshot/save. El harness del selector acredita parser/CPU, no equivalencia de su shader GPU.
+- Selector: suite216 aserciones, instalador53, Python14; harness reproducible32000celdas×3rutas del parser y18 pares CPU/snapshot/save. El harness del selector acredita parser/CPU, no equivalencia de su shader GPU.
 - Se descartaron el hoisting explícito por fila (sin ganancia repetible), memo de glifos en escenas dispersas (regresión) y el candidato intermedio con checks dense/memo por celda.
 - Bundles de ensayo0.4.1-round-test por arquitectura: deben contener `libambientcells.so`, manifest/version/entryPoint coherentes, renderer esperado y checksum correcto. Son artefactos de ensayo; no se etiquetó/publicó un release ni se reemplazaron instalaciones.
 
@@ -87,4 +87,6 @@ Los tiempos de etapa y el coste por cuadro dependen de la frecuencia y de los cu
 
 Renderer: commits locales `95df5e1` (tanda previa consolidada) y `bfeaa91` (esta ronda). Selector: `f9f1386` (GPU/stream/instalador) y `d590225` (harness reproducible). Los bundles son de ensayo0.4.1-round-test, con ELF y hashes verificados por arquitectura; versiones de producción y tags sin cambios. Intel volvió a `none`, sin renderer ni captura de prueba y con los cuatro governors originales `schedutil`. Su binario instalado conserva SHA256 `6f9b0f7e…`.
 
-El binario instalado en M2 conserva SHA256 `cddfa631…`. Su estado leído al cierre es `none`; no se forzó un cambio de fondo. Los bundles nuevos permanecen como artefactos de ensayo.
+El binario instalado en M2 conserva SHA256 `cddfa631…`. Se cerró una fuga de aislamiento en los tests: HOME temporal no basta si se hereda el bus real. El fixture ahora aísla también DBus y simula systemctl/systemd-run; la eliminación de una unidad activa se comprueba sin tocar el servicio del usuario. El fondo M2 quedó restaurado en `sand-clock-dunes` con el binario anterior y permaneció activo durante la nueva suite. Los bundles nuevos permanecen como artefactos de ensayo.
+
+El aislamiento global de pruebas quedó en `ed5ea37` (selector) y `f55f06e` (worktree de informes). La suite completa del selector pasó216 aserciones después del cambio.

@@ -79,10 +79,14 @@
     "native_parser_cells_each_arch": 32000,
     "native_parser_routes": 3,
     "native_cpu_snapshot_pairs_each_arch": 18,
-    "selector_assertions": 215,
-    "installer_assertions": 52,
+    "selector_assertions": 216,
+    "installer_assertions": 53,
     "python_selector_tests": 14,
     "intel_original_governors_restored": true,
-    "intel_installed_binary_preserved": true
-  }
+    "intel_installed_binary_preserved": true,
+    "session_bus_isolated_in_fixtures": true
+  },
+  "selector_test_isolation_commit": "ed5ea37",
+  "m2_final_background": "sand-clock-dunes",
+  "m2_installed_renderer_sha256": "cddfa631dde14a41a8a31a44cc7d2ba7066505b8543afeb6a29ffcda87d44116"
 }
