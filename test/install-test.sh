@@ -67,7 +67,12 @@ tar -czf "$scratch/site/$bundle" -C "$scratch/pack" bundle
 (cd "$scratch/site" && sha256sum "$bundle" >SHA256SUMS)
 assert "it installs a new source" bash "$install_sh"
 
+# Simulate our source being active; removal must reach only the fake unit.
+printf 'demo\n' >"$HOME/.local/state/omarchy/ambient"
+stub systemctl 'printf "%s\n" "$*" >>"$HOME/systemctl.calls"; [[ $* == *is-active* ]] && exit 0; exit 1'
 assert "it uninstalls" bash "$install_sh" --uninstall
+assert "service removal stays inside the fixture" grep -q -- '--user stop omarchy-ambient' "$HOME/systemctl.calls"
+stub systemctl 'printf "%s\n" "$*" >>"$HOME/systemctl.calls"; exit 1'
 assert "the source is gone" test ! -e "$sources/demo"
 assert "a config it created is gone" test ! -e "$XDG_CONFIG_HOME/omarchy/ambient/other.conf"
 assert_eq "an edited one stays" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=pause"

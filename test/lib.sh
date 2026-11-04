@@ -9,6 +9,8 @@ trap 'rm -rf "$scratch"' EXIT
 
 export HOME=$scratch/home XDG_CONFIG_HOME=$scratch/home/.config XDG_DATA_HOME=$scratch/home/.local/share
 export OMARCHY_AMBIENT_POWER_SUPPLIES=$scratch/power XDG_RUNTIME_DIR=$scratch/run
+# A scratch HOME does not isolate systemctl when the real session bus is inherited.
+export DBUS_SESSION_BUS_ADDRESS=unix:path=$XDG_RUNTIME_DIR/bus
 mkdir -p "$HOME/.local/state/omarchy/current" "$scratch/stubs" "$scratch/power/AC" "$XDG_RUNTIME_DIR"
 echo Mains >"$scratch/power/AC/type"
 echo 1 >"$scratch/power/AC/online"
@@ -18,6 +20,11 @@ stub() {
   printf '#!/bin/bash\n%s\n' "$2" >"$scratch/stubs/$1"
   chmod +x "$scratch/stubs/$1"
 }
+
+# No fixture may stop or start the real user service. Tests that need an active
+# unit provide their own response; even an absolute systemctl cannot reach it.
+stub systemctl 'printf "%s\n" "$*" >>"$HOME/systemctl.calls"; exit 1'
+stub systemd-run 'printf "%s\n" "$*" >>"$HOME/systemd-run.calls"; exit 1'
 
 # hyprctl answers from monitors.json and workspaces.json in the scratch dir,
 # and logs anything else it is asked to hyprctl.log.
