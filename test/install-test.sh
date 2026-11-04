@@ -27,6 +27,15 @@ tar -czf "$scratch/site/$bundle" -C "$scratch/pack" bundle
 export OMARCHY_AMBIENT_RELEASE=file://$scratch/site
 install_sh=$ROOT/install.sh
 
+# An Omarchy without plugins is told so before anything is downloaded.
+old_omarchy=$scratch/old-omarchy
+mkdir -p "$old_omarchy"
+ln -s "$(command -v uname)" "$old_omarchy/uname"
+ln -s "$scratch/stubs/hyprctl" "$old_omarchy/hyprctl"
+output=$(PATH=$old_omarchy "$(command -v bash)" "$install_sh" 2>&1) && status=0 || status=$?
+assert "an Omarchy before 4.0 stops the install" test "$status" -ne 0
+assert_eq "and says why" "$output" "omarchy-ambient: this needs Omarchy 4.0 or newer"
+
 mkdir -p "$HOME/.config/omarchy/ambient"
 printf 'on_battery=pause\n' >"$HOME/.config/omarchy/ambient/keep.conf"
 assert "it installs" bash "$install_sh"

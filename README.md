@@ -32,6 +32,7 @@ Anyone can add more: a terminal program, an emulator, a shader, a game. See
 curl -fsSL https://raw.githubusercontent.com/avillagran/omarchy-ambient/main/install.sh | bash
 ```
 
+It needs Omarchy 4.0 or newer, on x86_64 or ARM64.
 It installs for your user under `~/.local`, without sudo, and verifies the download.
 Remove it with the same command, ending in `| bash -s -- --uninstall`.
 

@@ -120,6 +120,8 @@ case $(uname -m) in
   *) die "$(uname -m) is not supported" ;;
 esac
 command -v hyprctl >/dev/null || die "this needs Omarchy on Hyprland"
+# The selector is an Omarchy plugin, and plugins arrived in Omarchy 4.0.
+command -v omarchy-plugin-enable >/dev/null || die "this needs Omarchy 4.0 or newer"
 
 missing=()
 for pair in curl:curl jq:jq socat:socat inotifywait:inotify-tools python3:python \
