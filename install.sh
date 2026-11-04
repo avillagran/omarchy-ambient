@@ -54,6 +54,42 @@ forget_source() {
   rmdir "$data/omarchy-ambient/$id" 2>/dev/null || true
 }
 
+# Super+Ctrl+Space opens this selector instead of Omarchy's own background menu:
+# a Lua file beside the user's bindings, and one marked require in hyprland.lua.
+hyprland_lua=$config/hypr/hyprland.lua
+shortcut=$config/hypr/ambient-background-selector.lua
+shortcut_mark="-- Installed by omarchy-ambient's install.sh; its --uninstall removes it."
+shortcut_require='require("hypr.ambient-background-selector")'
+require_begin="-- >>> omarchy-ambient: Super+Ctrl+Space opens the Ambient selector"
+require_end="-- <<< omarchy-ambient"
+
+bind_shortcut() {
+  local lua=$1
+  [[ -f $hyprland_lua ]] || { say "Bind Super+Ctrl+Space by hand to: omarchy-ambient-select current"; return 0; }
+  [[ $(head -n1 "$shortcut" 2>/dev/null) == "$shortcut_mark" ]] || keep "$shortcut"
+  # The file first: Hyprland reloads as soon as hyprland.lua changes.
+  { printf '%s\n' "$shortcut_mark"; cat "$lua"; } >"$shortcut"
+  grep -qF "$shortcut_require" "$hyprland_lua" && return 0
+  [[ -z $(tail -c1 "$hyprland_lua") ]] || printf '\n' >>"$hyprland_lua"
+  printf '%s\n%s\n%s\n' "$require_begin" "$shortcut_require" "$require_end" >>"$hyprland_lua"
+}
+
+unbind_shortcut() {
+  local temp
+  if grep -qxF -- "$require_begin" "$hyprland_lua" 2>/dev/null; then
+    temp=$(mktemp "$hyprland_lua.XXXXXX")
+    BEGIN_MARK=$require_begin END_MARK=$require_end awk '
+      $0 == ENVIRON["BEGIN_MARK"] { skip = 1; next }
+      skip && $0 == ENVIRON["END_MARK"] { skip = 0; next }
+      !skip' "$hyprland_lua" >"$temp"
+    cat "$temp" >"$hyprland_lua"
+    rm -f "$temp"
+  fi
+  if [[ $(head -n1 "$shortcut" 2>/dev/null) == "$shortcut_mark" ]]; then
+    rm -f "$shortcut"
+  fi
+}
+
 uninstall() {
   local id conf active rebuild_menu=false
   [[ -f $manifest ]] || die "nothing to remove: this installer did not install it here"
@@ -93,6 +129,7 @@ uninstall() {
   elif [[ -L $bindir/omarchy-ambient ]]; then
     rm -f "$bindir/omarchy-ambient"
   fi
+  unbind_shortcut
   rm -rf "${config:?}/omarchy/plugins/$plugin_id" "$selector" "${cache:?}/omarchy/ambient-selector" "${cache:?}/omarchy-ttfx-layer"
   rm -f "$bindir/omarchy-ambient-select" "$bindir/omarchy-ambient-background-select"
   rmdir "$config/omarchy/ambient/sources" "$config/omarchy/ambient" 2>/dev/null || true
@@ -224,6 +261,9 @@ SCRIPT
 chmod +x "$bindir/omarchy-ambient-select"
 # The first name of this command, and the one the plugin calls.
 ln -s omarchy-ambient-select "$bindir/omarchy-ambient-background-select"
+
+# A bundle before 0.4.1 has no shortcut to install.
+[[ -f $b/hypr/ambient-background-selector.lua ]] && bind_shortcut "$b/hypr/ambient-background-selector.lua"
 
 # The shell only knows the plugin after a rescan, which takes a moment.
 enabled=false

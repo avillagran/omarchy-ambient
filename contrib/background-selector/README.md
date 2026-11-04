@@ -11,7 +11,8 @@ category and one item per activation, with no timer. Applying always goes throug
   previews and static posters for the slices next to the selected one.
 - `sources/` holds one Ambient source per scene.
 - `posters/` holds the still images for the carousel.
-- `ambient-background-selector.lua` binds the active category to a shortcut.
+- `ambient-background-selector.lua` binds Super+Ctrl+Space to the selector for the active
+  category. The installer puts it in `~/.config/hypr` and loads it from `hyprland.lua`.
 
 `omarchy-ambient-select background` starts the scene you pick. `omarchy-ambient-select
 screensaver` opens the same carousel and stores the choice with `omarchy-ambient

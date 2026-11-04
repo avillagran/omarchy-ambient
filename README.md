@@ -35,6 +35,8 @@ curl -fsSL https://raw.githubusercontent.com/avillagran/omarchy-ambient/main/ins
 It needs Omarchy 4.0 or newer, on x86_64 or ARM64.
 It installs for your user under `~/.local`, without sudo, and verifies the download.
 Remove it with the same command, ending in `| bash -s -- --uninstall`.
+After the install, Super+Ctrl+Space opens the selector in place of Omarchy's
+background menu, and the uninstall gives the shortcut back.
 
 ```sh
 omarchy-ambient start sand-clock-galaxy            # try one

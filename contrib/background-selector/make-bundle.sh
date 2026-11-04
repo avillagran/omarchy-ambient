@@ -22,6 +22,8 @@ make -s -C "$root" install DESTDIR="$b/ambient" PREFIX=
 cp "$renderer" "$b/selector/omarchy-ttfx-layer"
 cp "$here/background_selector.py" "$here/catalog.json" "$here/live-preview/run-preview.py" "$b/selector/"
 cp -r "$here/sources" "$here/posters" "$b/"
+mkdir -p "$b/hypr"
+cp "$here/ambient-background-selector.lua" "$b/hypr/"
 # The shell caches QML by path, so each version loads from its own directory.
 mkdir -p "$b/plugin/v$version"
 cp -r "$here/live-preview/." "$b/plugin/v$version/"

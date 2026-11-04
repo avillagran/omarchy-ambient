@@ -12,7 +12,8 @@ monitors '[]'
 workspaces '[]'
 
 b=$scratch/pack/bundle
-mkdir -p "$b/selector" "$b/posters" "$b/plugin/bin" "$b/sources/demo" "$scratch/site"
+mkdir -p "$b/selector" "$b/posters" "$b/plugin/bin" "$b/sources/demo" "$b/hypr" "$scratch/site"
+cp "$ROOT/contrib/background-selector/ambient-background-selector.lua" "$b/hypr/"
 make -s -C "$ROOT" install DESTDIR="$b/ambient" PREFIX= >/dev/null
 echo 9.9.9 >"$b/VERSION"
 printf '#!/bin/bash\n' >"$b/selector/omarchy-ttfx-layer"
@@ -36,8 +37,13 @@ output=$(PATH=$old_omarchy "$(command -v bash)" "$install_sh" 2>&1) && status=0 
 assert "an Omarchy before 4.0 stops the install" test "$status" -ne 0
 assert_eq "and says why" "$output" "omarchy-ambient: this needs Omarchy 4.0 or newer"
 
-mkdir -p "$HOME/.config/omarchy/ambient"
+mkdir -p "$HOME/.config/omarchy/ambient" "$XDG_CONFIG_HOME/hypr"
 printf 'on_battery=pause\n' >"$HOME/.config/omarchy/ambient/keep.conf"
+hyprland_lua=$XDG_CONFIG_HOME/hypr/hyprland.lua
+shortcut=$XDG_CONFIG_HOME/hypr/ambient-background-selector.lua
+# Without a final newline, as an editor may leave it.
+printf 'require("default.hypr.omarchy")\nrequire("hypr.bindings")' >"$hyprland_lua"
+hyprland_before=$(cat "$hyprland_lua")
 assert "it installs" bash "$install_sh"
 data=$XDG_DATA_HOME/omarchy-ambient
 sources=$XDG_CONFIG_HOME/omarchy/ambient/sources
@@ -52,6 +58,10 @@ assert "a shell on this version needs no restart" test ! -e "$HOME/selector-rest
 assert_eq "the old name is an alias" "$(readlink "$HOME/.local/bin/omarchy-ambient-background-select")" omarchy-ambient-select
 assert_eq "it waits for the shell to know the plugin" "$(cat "$scratch/tries")" 3
 assert_eq "scenes keep running on battery" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=run"
+assert "Super+Ctrl+Space is bound" grep -q 'o.bind("SUPER + CTRL + SPACE"' "$shortcut"
+assert "to the selector" grep -q 'omarchy-ambient-background-select" current' "$shortcut"
+assert_eq "hyprland.lua loads it once" "$(grep -c 'require("hypr.ambient-background-selector")' "$hyprland_lua")" 1
+assert_eq "after the user's own lines" "$(sed -n 2p "$hyprland_lua")" 'require("hypr.bindings")'
 
 printf 'on_battery=pause\n' >"$XDG_CONFIG_HOME/omarchy/ambient/demo.conf"
 # An update must work while a scene runs from the installed renderer.
@@ -64,6 +74,7 @@ running=$!
 assert "it installs again" bash "$install_sh"
 kill "$running"
 assert_eq "a second run keeps the user's settings" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=pause"
+assert_eq "and loads the shortcut still once" "$(grep -c 'require("hypr.ambient-background-selector")' "$hyprland_lua")" 1
 
 export AMBIENT_TEST_SELECTOR_VERSION=old
 assert "an older running selector requests a shell restart" bash "$install_sh"
@@ -89,6 +100,9 @@ assert "the plugin is gone" test ! -e "$XDG_CONFIG_HOME/omarchy/plugins/avillagr
 assert "the selector is gone" test ! -e "$data/selector"
 assert "the renderer link is gone" test ! -e "$HOME/.local/bin/omarchy-ttfx-layer"
 assert_eq "config files stay" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/keep.conf")" "on_battery=pause"
+assert "the shortcut is gone" test ! -e "$shortcut"
+# Only the final newline it added stays.
+assert_eq "hyprland.lua is as it was" "$(cat "$hyprland_lua")" "$hyprland_before"
 
 printf 'corrupt' >>"$scratch/site/$bundle"
 output=$(bash "$install_sh" 2>&1) && status=0 || status=$?
@@ -112,7 +126,11 @@ printf 'mine\n' >"$HOME/.cache/omarchy/ambient-selector/mine.jpg"
 ln -s /somewhere/mine "$data/demo/bin/omarchy-ttfx-layer"
 printf '#!/bin/bash\necho mine\n' >"$HOME/.local/bin/omarchy-ambient"
 chmod +x "$HOME/.local/bin/omarchy-ambient"
+printf -- '-- mine\n' >"$shortcut"
+printf 'require("hypr.ambient-background-selector")\n' >"$hyprland_lua"
+hyprland_before=$(sha256sum <"$hyprland_lua")
 install_output=$(bash "$install_sh" 2>&1)
+assert_eq "a hyprland.lua that loads it already is left alone" "$(sha256sum <"$hyprland_lua")" "$hyprland_before"
 assert "it installs over an existing setup" test -f "$data/selector/installed-sources"
 assert_eq "its source is in use" "$(cat "$sources/demo/source.conf")" "name=Demo"
 assert "and again" bash "$install_sh"
@@ -124,6 +142,8 @@ assert_eq "the existing command is back" "$(readlink "$HOME/.local/bin/omarchy-a
 assert_eq "the existing poster is back" "$(cat "$HOME/.cache/omarchy/ambient-selector/mine.jpg")" "mine"
 assert_eq "the existing link is back" "$(readlink "$data/demo/bin/omarchy-ttfx-layer")" "/somewhere/mine"
 assert_eq "the existing program is back" "$("$HOME/.local/bin/omarchy-ambient")" "mine"
+assert_eq "the existing shortcut is back" "$(cat "$shortcut")" "-- mine"
+assert_eq "and so is its hyprland.lua" "$(sha256sum <"$hyprland_lua")" "$hyprland_before"
 assert_eq "its output has no stray errors" "$(grep -c 'No such file' <<<"$install_output")" 0
 assert "the backup is gone" test ! -e "$XDG_DATA_HOME/omarchy-ambient-backup"
 
