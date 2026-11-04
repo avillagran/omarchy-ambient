@@ -308,6 +308,7 @@ Item {
   property int skewOffset: 28
   property int headerH: 34
   property int catSpacing: 8
+  property int labelH: 28
 
   onOpenedChanged: { root.receivedWindow=0; root.paintWindow=0; root.measuredAt=Date.now(); if (!opened) root.resetSelection() }
 
@@ -1228,23 +1229,6 @@ Item {
                       }
                     }
 
-                    // item label on expanded slice
-                    Text {
-                      visible: slice.selected && root.showLabels
-                      anchors.bottom: parent.bottom
-                      anchors.bottomMargin: 14
-                      anchors.horizontalCenter: parent.horizontalCenter
-                      width: parent.width - 40
-                      text: slice.itemData ? slice.itemData.name : ""
-                      color: root.foreground
-                      style: Text.Outline
-                      styleColor: Util.alpha(root.dimColor, 0.7)
-                      font.pixelSize: Style.font.display
-                      font.weight: Font.DemiBold
-                      horizontalAlignment: Text.AlignHCenter
-                      elide: Text.ElideRight
-                    }
-
                     // dim unselected
                     Rectangle {
                       anchors.fill: parent
@@ -1276,6 +1260,35 @@ Item {
                   }
                 }
               }
+            }
+          }
+
+          // ---- selected item name, under the box: the live preview window
+          // covers the slice once it draws, so a name inside it would vanish.
+          Item {
+            width: catCarousel.width
+            height: catDelegate.active && root.showLabels ? root.labelH : 0
+            visible: height > 0
+
+            Text {
+              anchors.horizontalCenter: parent.horizontalCenter
+              anchors.verticalCenter: parent.verticalCenter
+              width: root.expandedWidth - 40
+              text: {
+                var item = root.currentItems[root.selectedIndex]
+                return item ? item.name : ""
+              }
+              opacity: root.collapsing ? 0 : 1
+              color: root.foreground
+              style: Text.Outline
+              styleColor: Util.alpha(root.dimColor, 0.7)
+              font.family: Style.font.display
+              font.pixelSize: 16
+              font.weight: Font.DemiBold
+              horizontalAlignment: Text.AlignHCenter
+              elide: Text.ElideRight
+
+              Behavior on opacity { NumberAnimation { duration: 150 } }
             }
           }
         }
