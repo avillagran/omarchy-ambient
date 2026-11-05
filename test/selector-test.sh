@@ -57,4 +57,17 @@ printf 'source=screensaver\n' >"$XDG_CONFIG_HOME/omarchy/ambient/screensaver.con
 "$ambient" status >/dev/null
 assert "the terminal effects screensaver stays as it was" grep -qx source=screensaver "$XDG_CONFIG_HOME/omarchy/ambient/screensaver.conf"
 
+# A scene runs the installed renderer even when an older install left a link
+# for it, and falls back to that link only where nothing is installed.
+mkdir -p "$scratch/renderer" "$scratch/scene-data/bin"
+printf '#!/bin/bash\necho installed "$@"\n' >"$scratch/renderer/omarchy-ttfx-layer"
+printf '#!/bin/bash\necho stale "$@"\n' >"$scratch/scene-data/bin/omarchy-ttfx-layer"
+chmod +x "$scratch/renderer/omarchy-ttfx-layer" "$scratch/scene-data/bin/omarchy-ttfx-layer"
+scene=$prefix/share/omarchy-ambient/sources/neon-city/run
+for name in OUTPUT WIDTH HEIGHT SCALE NAMESPACE LAYER KEYBOARD; do export "OMARCHY_AMBIENT_$name=x"; done
+assert "a scene runs the installed renderer over a stale link" \
+  test "$(PATH=$scratch/renderer OMARCHY_AMBIENT_DATA=$scratch/scene-data /bin/bash "$scene" | cut -d ' ' -f 1)" == installed
+assert "a scene falls back to its link when no renderer is installed" \
+  test "$(PATH=$scratch/empty OMARCHY_AMBIENT_DATA=$scratch/scene-data /bin/bash "$scene" | cut -d ' ' -f 1)" == stale
+
 finish_tests

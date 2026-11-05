@@ -12,7 +12,8 @@ if [[ $resolution == auto ]]; then
   if ((resolution<1)); then resolution=1; fi
   if ((resolution>8)); then resolution=8; fi
 fi
-# A renderer linked for this source wins; otherwise the packaged one.
-renderer=$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer
-[[ -x $renderer ]] || renderer=omarchy-ttfx-layer
+# The installed renderer wins: a link left for this source by an older
+# install may point at a build without this scene. The link stands in only
+# where no renderer is installed.
+renderer=$(command -v omarchy-ttfx-layer) || renderer=$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer
 exec "$renderer" --interactive-eye --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}" --resolution "$resolution"

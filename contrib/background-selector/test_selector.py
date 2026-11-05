@@ -2,6 +2,8 @@ import importlib.util, tempfile, unittest
 from unittest.mock import patch
 from pathlib import Path
 p=Path(__file__).with_name('background_selector.py');s=importlib.util.spec_from_file_location('ambient_background_selector',p);m=importlib.util.module_from_spec(s);s.loader.exec_module(m)
+# Scene files come only from what a test sets up, never from this machine.
+m.SOURCE_DIRS=[]
 class Routing(unittest.TestCase):
  def test_active_mode_routing_uses_actual_background_not_saved_screensaver(self):
   for status,category in [('none','theme'),('amiga 14651-Faster_Than_Hell','amiga'),('screensaver fx:matrix','background'),('ttfx fixed','background'),('matrix-reactive ','background'),('eye-reactive ','background'),('tunnel-reactive ','background'),('neon-city ','background'),('vector-highway ','background'),('circuit-run ','background'),('sunset-drive ','background'),('','theme')]:

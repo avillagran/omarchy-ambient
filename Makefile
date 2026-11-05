@@ -2,7 +2,7 @@ PREFIX ?= /usr/local
 DESTDIR ?=
 # The selector plugin loads from a directory named after it: the shell caches
 # QML by path, so a new release must not reuse the old one.
-VERSION ?= 0.5.0
+VERSION ?= 0.5.1
 
 BUILD := build
 VENDOR := vendor/gtk4-layer-shell
