@@ -16,36 +16,33 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 b=$work/bundle
 
-mkdir -p "$b/selector" "$out"
-make -s -C "$root"
-make -s -C "$root" install DESTDIR="$b/ambient" PREFIX=
+mkdir -p "$b/selector" "$b/sources" "$out"
+make -s -C "$root" all
+make -s -C "$root" install-core DESTDIR="$b/ambient" PREFIX=
 cp "$renderer" "$b/selector/omarchy-ttfx-layer"
-cp "$here/background_selector.py" "$here/catalog.json" "$here/live-preview/run-preview.py" "$b/selector/"
-cp -r "$here/sources" "$here/posters" "$b/"
+cp "$here/background_selector.py" "$here/catalog.json" "$here/run-preview.py" "$b/selector/"
+# The scenes the carousel offers; install.sh copies them beside the user's sources.
+for dir in "$root"/sources/*/; do
+  case $(basename "$dir") in amiga | screensaver | ttfx) continue ;; esac
+  cp -r "$dir" "$b/sources/"
+done
+cp -r "$here/posters" "$b/"
 mkdir -p "$b/hypr"
 cp "$here/ambient-background-selector.lua" "$b/hypr/"
 # The shell caches QML by path, so each version loads from its own directory.
-mkdir -p "$b/plugin/v$version"
-cp -r "$here/live-preview/." "$b/plugin/v$version/"
-rm -f "$b/plugin/v$version/run-preview.py"
+mkdir -p "$b/plugin/v$version/bin"
+cp "$here"/live-preview/*.qml "$here"/live-preview/*.js "$here/live-preview/manifest.json" "$b/plugin/v$version/"
+cp "$here/live-preview/bin/list.sh" "$b/plugin/v$version/bin/"
+printf '%s\n' '#!/bin/bash' 'exec "$HOME/.local/bin/omarchy-ambient-select" "$@"' >"$b/plugin/v$version/bin/select"
+chmod 755 "$b/plugin/v$version/bin/select" "$b/plugin/v$version/bin/list.sh"
 # The native preview painter is optional: without it the carousel uses Canvas.
-native=$b/plugin/v$version/native/AmbientCells
-if qt=$(pkg-config --cflags --libs Qt6Quick Qt6Qml Qt6Gui 2>/dev/null) && [[ -x /usr/lib/qt6/moc && -x /usr/lib/qt6/rcc && -x /usr/lib/qt6/bin/qsb ]]; then
-  # The cell shaders are baked for every graphics API and linked into the library.
-  for stage in vert frag; do
-    /usr/lib/qt6/bin/qsb --glsl "100 es,120,150" -o "$native/cells.$stage.qsb" "$native/cells.$stage"
-  done
-  (cd "$native" && /usr/lib/qt6/rcc -name ambientcells cells.qrc -o qrc_cells.cpp)
-  # shellcheck disable=SC2086
-  /usr/lib/qt6/moc $(pkg-config --cflags Qt6Quick Qt6Qml Qt6Gui) "$native/cellpreview.cpp" -o "$native/cellpreview.moc"
-  # shellcheck disable=SC2086
-  g++ -O2 -std=c++17 -fPIC -shared -I"$native" "$native/cellpreview.cpp" "$native/qrc_cells.cpp" -o "$native/libambientcells.so" $qt
-  strip "$native/libambientcells.so"
+if [[ -f $root/build/native/libambientcells.so ]]; then
+  mkdir -p "$b/plugin/v$version/native/AmbientCells"
+  cp "$root/build/native/libambientcells.so" "$here/live-preview/native/AmbientCells/qmldir" "$b/plugin/v$version/native/AmbientCells/"
+  strip "$b/plugin/v$version/native/AmbientCells/libambientcells.so"
 else
   echo "make-bundle: no Qt 6 development files or shader tools, the bundle keeps the Canvas preview" >&2
-  rm -rf "$b/plugin/v$version/native"
 fi
-rm -f "$native"/cellpreview.{cpp,moc} "$native"/cells.{vert,frag,qrc,vert.qsb,frag.qsb} "$native/qrc_cells.cpp"
 mv "$b/plugin/v$version/manifest.json" "$b/plugin/"
 python3 -c '
 import json, sys

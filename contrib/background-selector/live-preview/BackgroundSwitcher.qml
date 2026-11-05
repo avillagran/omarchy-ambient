@@ -385,7 +385,7 @@ Item {
   property bool fpsCounter: false
   function toggleFpsCounter() {
     root.fpsCounter=!root.fpsCounter
-    Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--fps-counter"])
+    Quickshell.execDetached([root.scriptPath("bin/select"),"--fps-counter"])
   }
   function stepResolution(delta) {
     const item=root.currentItems[root.selectedIndex]
@@ -411,7 +411,7 @@ Item {
   }
   function sendTuning() {
     root.resolutionChanged=true
-    Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--tune",root.resolutionItem,String(root.resolutionSteps),String(root.fpsLimit)])
+    Quickshell.execDetached([root.scriptPath("bin/select"),"--tune",root.resolutionItem,String(root.resolutionSteps),String(root.fpsLimit)])
   }
   function flushResolution() {
     if (!resolutionApplyTimer.running) return
@@ -426,7 +426,7 @@ Item {
     root.learnedFps=0
     root.learnedDensity=0
     if (!item || item.type !== "audio") return
-    resolutionRead.command=[root.home+"/.local/bin/omarchy-ambient-background-select","--tune-get",item.path]
+    resolutionRead.command=[root.scriptPath("bin/select"),"--tune-get",item.path]
     resolutionRead.running=true
   }
   onSelectedIndexChanged: readResolution()
@@ -435,7 +435,7 @@ Item {
   function close(restore) {
     if (!restore) { root.applyCurrent(); return }
     resolutionApplyTimer.stop()
-    if (root.resolutionChanged) Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--tune-revert"])
+    if (root.resolutionChanged) Quickshell.execDetached([root.scriptPath("bin/select"),"--tune-revert"])
     root.resolutionChanged=false
     root.opened=false
   }
@@ -444,7 +444,7 @@ Item {
     const pending=resolutionApplyTimer.running && item && root.resolutionItem === item.path
     resolutionApplyTimer.stop()
     root.resolutionChanged=false
-    if (item) Quickshell.execDetached([root.home+"/.local/bin/omarchy-ambient-background-select","--apply-ascii",item.path].concat(pending ? [String(root.resolutionSteps),String(root.fpsLimit)] : []))
+    if (item) Quickshell.execDetached([root.scriptPath("bin/select"),"--apply-ascii",item.path].concat(pending ? [String(root.resolutionSteps),String(root.fpsLimit)] : []))
     root.opened=false
   }
   function loadCategory(idx, silent) {
@@ -514,7 +514,7 @@ Item {
   // mode (native effects wave/bars/donut/fire/starfield/life always work).
   Process {
     id: fxDaemon
-    command: ["python3",home+"/.local/share/omarchy-ambient/selector/run-preview.py"]
+    command: [root.scriptPath("bin/select"),"--preview-daemon"]
     stdinEnabled: true
     running: root.fxWanted && !root.fxStream
     onRunningChanged: {
@@ -562,7 +562,7 @@ Item {
 
   Process {
     id: pickingForRead
-    command: [root.home+"/.local/bin/omarchy-ambient-background-select","--picking-for"]
+    command: [root.scriptPath("bin/select"),"--picking-for"]
     running: root.opened
     stdout: StdioCollector {
       onStreamFinished: root.pickingScreensaver=this.text.trim()==="screensaver"
@@ -571,7 +571,7 @@ Item {
 
   Process {
     id: fpsCounterRead
-    command: [root.home+"/.local/bin/omarchy-ambient-background-select","--fps-counter-get"]
+    command: [root.scriptPath("bin/select"),"--fps-counter-get"]
     running: root.opened
     stdout: StdioCollector {
       onStreamFinished: root.fpsCounter=this.text.trim()==="1"
@@ -595,7 +595,7 @@ Item {
 
   Process {
     id: readPathProc
-    command: [root.home+"/.local/bin/omarchy-ambient-background-select","--current-choice"]
+    command: [root.scriptPath("bin/select"),"--current-choice"]
     stdout: StdioCollector {
       onStreamFinished: {
         root.originalPath = this.text.trim()

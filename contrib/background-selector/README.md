@@ -6,10 +6,14 @@ category and one item per activation, with no timer. Applying always goes throug
 `omarchy-ambient`, so its lifecycle, visibility and battery rules stay in charge.
 
 - `background_selector.py` lists the choices and applies them.
-- `catalog.json` lists the ASCII scenes, with the non-TTFX ones first.
+- `catalog.json` lists the ASCII scenes, with the non-TTFX ones first. The single
+  TTFx effects are choices of the `ttfx` source, `fx:<effect>`.
 - `live-preview/` is an Omarchy shell plugin: a slice carousel with live ASCII
-  previews and static posters for the slices next to the selected one.
-- `sources/` holds one Ambient source per scene.
+  previews and static posters for the slices next to the selected one. It calls
+  the selector through its `bin/select`, which the install writes.
+- `run-preview.py` owns the preview renderer's process group.
+- The scenes are built-in sources of the engine, in `sources/` at the top of this
+  repository.
 - `posters/` holds the still images for the carousel.
 - `ambient-background-selector.lua` binds Super+Ctrl+Space to the selector for the active
   category. The installer puts it in `~/.config/hypr` and loads it from `hyprland.lua`.
@@ -21,8 +25,13 @@ alias of `screensaver`, and `omarchy-ambient-background-select` is an alias of t
 
 ## Install
 
+`make install` at the top of this repository installs the selector with the engine:
+`omarchy-ambient-select` in `bin`, the selector in `lib/omarchy-ambient/selector`, the
+plugin and the posters in `share/omarchy-ambient`. That is how the package and Omarchy
+ship it; `omarchy-ambient selector enable` links the plugin for the user.
+
 The `install.sh` at the top of this repository installs all of this for the current
-user. It downloads a release bundle, which `make-bundle.sh` builds from this directory
+user instead, where the system does not ship it. It downloads a release bundle, which `make-bundle.sh` builds from this directory
 and an `omarchy-ttfx-layer` binary with `--neon-scene`.
 
 ## Build a bundle
@@ -104,7 +113,7 @@ shows both, as `auto (120 fps)` and `auto (+2)`. A resolution or limit chosen
 with the keys always wins. On battery every scene drops to 20 and returns to
 its limit on the charger.
 
-The `screensaver` source keeps 20 fps: its TTFx effects move one step per
-frame, so an automatic limit would change their speed.
+The single TTFx effects run on the `ttfx` source, also in auto: each effect keeps
+its own pace, and the limit only holds it back where the machine cannot afford it.
 
 F shows or hides the frame rate on every running scene, without restarting it.

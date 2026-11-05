@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # omarchy:summary=Run a live program (screensaver, Amiga demo, game...) as the background or the screensaver
-# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | install | remove | installed | check <source-dir> | layer <command...>
+# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | selector [enable | disable] | install | remove | installed | check <source-dir> | layer <command...>
 # omarchy:examples=omarchy-ambient start screensaver
 
 # A live background is a program drawing behind the windows instead of a still
@@ -789,6 +789,50 @@ move_legacy() {
 move_legacy "$LEGACY_CONFIG_DIR" "$CONFIG_DIR"
 move_legacy "$LEGACY_DATA_DIR" "$DATA_DIR"
 
+# Before 0.5 the selector drew single effects through a copy of the ttfx
+# source named screensaver; the ttfx source takes the same choices now.
+if grep -qx 'source=screensaver' "$SCREENSAVER_CONF" 2>/dev/null &&
+  grep -q '^choice=fx:' "$SCREENSAVER_CONF"; then
+  sed -i 's/^source=screensaver$/source=ttfx/' "$SCREENSAVER_CONF"
+fi
+
+# The selector is an Omarchy shell plugin that ships with this program. The
+# shell finds plugins in the user's plugin directory, so a link points there.
+SELECTOR_PLUGIN=avillagran.ambient-selector
+SELECTOR_LINK=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/$SELECTOR_PLUGIN
+selector_dir=$root/share/omarchy-ambient/plugin
+
+selector_enable() {
+  local _
+  [[ -f $selector_dir/manifest.json ]] || fail "The selector is not installed with this omarchy-ambient"
+  if [[ -e $SELECTOR_LINK && ! -L $SELECTOR_LINK ]]; then
+    # A copy installed by hand, by install.sh say, stays in charge.
+    :
+  elif [[ $(readlink "$SELECTOR_LINK") != "$selector_dir" ]]; then
+    mkdir -p "${SELECTOR_LINK%/*}"
+    ln -sfn "$selector_dir" "$SELECTOR_LINK"
+  fi
+  # Without a running shell the selector enables itself the first time it opens.
+  command -v omarchy-plugin-enable >/dev/null || return 0
+  omarchy-shell -q shell rescanPlugins >/dev/null 2>&1 || return 0
+  # The shell knows the plugin once the rescan finishes, which takes a moment.
+  for _ in {1..20}; do
+    omarchy-plugin-enable "$SELECTOR_PLUGIN" >/dev/null 2>&1 && return 0
+    sleep 0.25
+  done
+  fail "The shell did not pick up the background selector; try: omarchy-plugin-enable $SELECTOR_PLUGIN"
+}
+
+selector_disable() {
+  if command -v omarchy-plugin-disable >/dev/null; then
+    omarchy-plugin-disable "$SELECTOR_PLUGIN" >/dev/null 2>&1
+  fi
+  if [[ -L $SELECTOR_LINK && $(readlink "$SELECTOR_LINK") == "$selector_dir" ]]; then
+    rm -f "$SELECTOR_LINK"
+  fi
+  return 0
+}
+
 usage="Usage: omarchy-ambient list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | install | remove | installed | check <source-dir> | layer <command...>"
 
 case $1 in
@@ -835,6 +879,13 @@ case $1 in
     ;;
   remove)
     omarchy_uninstall
+    ;;
+  selector)
+    case ${2:-enable} in
+      enable) selector_enable ;;
+      disable) selector_disable ;;
+      *) echo "Usage: omarchy-ambient selector [enable | disable]" >&2; exit 1 ;;
+    esac
     ;;
   installed)
     omarchy_status

@@ -3,10 +3,15 @@
 import json, os, random, subprocess, sys
 from pathlib import Path
 H=Path.home()
-DATA=H/'.local/share/omarchy-ambient'
+DATA=Path(os.environ.get('XDG_DATA_HOME') or H/'.local/share')/'omarchy-ambient'
 CACHE=H/'.cache/omarchy/ambient-selector'
 CATALOG=Path(__file__).resolve().with_name('catalog.json')
-AMBIENT=H/'.local/bin/omarchy-ambient'
+# The wrapper that runs this names the program and where the packaged files
+# are; without it, the layout install.sh leaves in the home directory.
+AMBIENT=os.environ.get('OMARCHY_AMBIENT_BIN') or 'omarchy-ambient'
+POSTERS=Path(os.environ.get('OMARCHY_AMBIENT_POSTERS') or CACHE)
+SOURCE_DIRS=[Path(d) for d in (os.environ.get('OMARCHY_AMBIENT_SOURCES') or f"{DATA}/sources:/usr/share/omarchy-ambient/sources").split(':') if d]
+PLUGIN='avillagran.ambient-selector'
 # The carousel picks for the background or for the screensaver: same scenes, same engine.
 TARGET=CACHE/'target'
 # What the arrows changed while the carousel is open, so Escape can put it back.
@@ -22,6 +27,15 @@ FPS_COUNTER=LAYER_CACHE/'show-fps'
 
 def run(*args):
     subprocess.run([str(x) for x in args],check=True)
+
+def succeeds(*args):
+    return subprocess.run([str(x) for x in args],stderr=subprocess.DEVNULL).returncode==0
+
+def open_carousel():
+    # A shell that has not loaded the selector yet gets it enabled first.
+    if not succeeds('omarchy-shell','-q',PLUGIN,'toggle'):
+        run(AMBIENT,'selector','enable')
+        run('omarchy-shell','-q',PLUGIN,'toggle')
 
 def capture(*args):
     p=subprocess.run([str(x) for x in args],text=True,stdout=subprocess.PIPE)
@@ -89,6 +103,9 @@ def parse_fps(value):
     return int(value) if value.isdigit() and MIN_FPS<=int(value)<=MAX_FPS else None
 
 def source_file(source,name):
+    """A file of the source omarchy-ambient runs: the user's copy first, as it does."""
+    for root in [CONFIG/'sources',*SOURCE_DIRS]:
+        if (root/source/'source.conf').exists():return root/source/name
     return CONFIG/'sources'/source/name
 
 def default_fps(source):
@@ -169,7 +186,7 @@ def active_category():
     source=capture(AMBIENT,'status').split(maxsplit=1)
     source=source[0] if source else 'none'
     if source=='amiga':return 'amiga'
-    if source in ("screensaver","ttfx","matrix-reactive","eye-reactive","tunnel-reactive","neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"):return "background"
+    if source in {'screensaver','ttfx',*(i['source'] for i in choices('screensaver'))}:return 'background'
     return 'theme'
 
 def for_screensaver():
@@ -178,8 +195,11 @@ def for_screensaver():
 def main(args):
     if args==['--preview-list']:
         for i in choices('screensaver'):
-            print('\t'.join(['audio',i['id'],i['label'],str(CACHE/i.get('poster',i['id']+'.jpg')),'',i['id']]))
+            print('\t'.join(['audio',i['id'],i['label'],str(POSTERS/i.get('poster',i['id']+'.jpg')),'',i['id']]))
         return
+    if args==['--preview-daemon']:
+        daemon=Path(__file__).resolve().with_name('run-preview.py')
+        os.execv(sys.executable,[sys.executable,str(daemon)])
     if args==['--current-choice']:
         if for_screensaver():
             print(capture(AMBIENT,'screensaver','--get'));return
@@ -233,7 +253,7 @@ def main(args):
         RESOLUTION_UNDO.unlink(missing_ok=True)
         if category=='screensaver':TARGET.write_text('screensaver')
         else:TARGET.unlink(missing_ok=True)
-        run('omarchy-shell','-q','avillagran.ambient-selector','toggle')
+        open_carousel()
 
 if __name__=='__main__':
     try:main(sys.argv[1:])

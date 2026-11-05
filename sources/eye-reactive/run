@@ -1,0 +1,18 @@
+#!/bin/bash
+set -eu
+for name in OUTPUT WIDTH HEIGHT SCALE NAMESPACE LAYER KEYBOARD; do
+  new=OMARCHY_AMBIENT_$name
+  export "OMARCHY_BG_LIVE_$name=${!new}"
+done
+resolution=${OMARCHY_AMBIENT_SETTING_RESOLUTION:-auto}
+if [[ $resolution == auto ]]; then
+  width=${OMARCHY_AMBIENT_WIDTH:-1728}
+  [[ $width =~ ^[0-9]+$ ]] || width=1728
+  resolution=$(((width+432)/864))
+  if ((resolution<1)); then resolution=1; fi
+  if ((resolution>8)); then resolution=8; fi
+fi
+# A renderer linked for this source wins; otherwise the packaged one.
+renderer=$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer
+[[ -x $renderer ]] || renderer=omarchy-ttfx-layer
+exec "$renderer" --interactive-eye --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}" --resolution "$resolution"

@@ -1,18 +1,20 @@
 # Maintainer: Andrés Villagrán <andres@villagranquiroz.cl>
 
 pkgname=omarchy-ambient
-pkgver=0.4.1
+pkgver=0.5.0
 pkgrel=1
 pkgdesc='Live backgrounds and screensavers for Omarchy: programs drawing behind the windows or over everything'
 arch=('x86_64' 'aarch64')
 url='https://github.com/avillagran/omarchy-ambient'
 license=('MIT')
-depends=('glibc' 'bash' 'jq' 'socat' 'inotify-tools' 'hyprland' 'wayland' 'libnotify' 'util-linux' 'omarchy-ttfx-layer')
-makedepends=('git' 'wayland-protocols')
+depends=('glibc' 'gcc-libs' 'bash' 'jq' 'socat' 'inotify-tools' 'hyprland' 'wayland' 'libnotify' 'util-linux' 'python'
+         'qt6-base' 'qt6-declarative' 'omarchy-ttfx-layer>=0.3.1')
+makedepends=('git' 'wayland-protocols' 'pkgconf' 'qt6-shadertools')
 optdepends=(
   'fs-uae: the Amiga Demos source'
   'curl: downloading the Amiga demos'
   'libarchive: unpacking the Amiga demos'
+  'libpulse: scenes that react to what is playing'
   'kitty: the Terminal Effects source'
   'ghostty: the Terminal Effects source'
 )
@@ -20,7 +22,7 @@ source=("git+$url.git#tag=v$pkgver")
 sha256sums=('SKIP')
 
 build() {
-  make -C "$pkgname"
+  make -C "$pkgname" VERSION="$pkgver"
 }
 
 check() {
@@ -28,6 +30,6 @@ check() {
 }
 
 package() {
-  make -C "$pkgname" DESTDIR="$pkgdir" PREFIX=/usr install
+  make -C "$pkgname" VERSION="$pkgver" DESTDIR="$pkgdir" PREFIX=/usr install
   install -Dm644 "$pkgname/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
 }

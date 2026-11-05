@@ -1,0 +1,4 @@
+#!/bin/bash
+# Runs the selector this plugin was installed with. make install and
+# make-bundle.sh replace this file with one that names it.
+exec omarchy-ambient-select "$@"

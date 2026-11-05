@@ -28,6 +28,10 @@ Anyone can add more: a terminal program, an emulator, a shader, a game. See
 
 ## Try the ASCII scenes
 
+On an Omarchy that ships omarchy-ambient, the scenes and their selector are
+already there: Super+Ctrl+Space or Appearance > Background opens them.
+Elsewhere, install them for your user:
+
 ```sh
 curl -fsSL https://raw.githubusercontent.com/avillagran/omarchy-ambient/main/install.sh | bash
 ```
@@ -130,16 +134,24 @@ the lock screen. Omarchy's launcher has to hand over to it; see
 
 ## Install
 
-Building needs a C compiler, `wayland-scanner` and `wayland-protocols`:
+Building needs a C compiler, `wayland-scanner`, `wayland-protocols` and `jq`.
+With the Qt 6 Quick development files and Qt Shader Tools it also builds the
+GPU painter of the selector's previews; without them the previews use Canvas.
 
 ```sh
 make
 make install PREFIX=~/.local
-omarchy-ambient install
+omarchy-ambient selector enable   # link the selector into the Omarchy shell
 ```
 
-At run time it needs `bash`, `jq`, `socat`, `inotifywait` (inotify-tools) and
-Hyprland, and the Omarchy Effects source needs
+`make install` puts in the program, its sources and scenes, and the background
+selector: `omarchy-ambient-select`, the shell plugin it opens, and the scene
+posters. `omarchy-ambient selector enable` links that plugin into
+`~/.config/omarchy/plugins` and enables it; the selector also does it the first
+time it opens. `omarchy-ambient selector disable` takes it back.
+
+At run time it needs `bash`, `jq`, `socat`, `inotifywait` (inotify-tools),
+`python3` and Hyprland, and the Omarchy Effects source and the scenes need
 [omarchy-ttfx-layer](https://github.com/avillagran/omarchy-ttfx-layer) on the
 PATH. Each other source lists what else it needs, and offers to install it the
 first time it starts. `packaging/arch/PKGBUILD` builds the package for x86_64

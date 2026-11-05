@@ -157,6 +157,9 @@ case $(uname -m) in
   *) die "$(uname -m) is not supported" ;;
 esac
 command -v hyprctl >/dev/null || die "this needs Omarchy on Hyprland"
+# Omarchy can ship omarchy-ambient with its selector; then there is nothing to add.
+[[ ! -x /usr/bin/omarchy-ambient-select ]] ||
+  die "this system already ships omarchy-ambient and its selector: open it with omarchy-ambient-select"
 # The selector is an Omarchy plugin, and plugins arrived in Omarchy 4.0.
 command -v omarchy-plugin-enable >/dev/null || die "this needs Omarchy 4.0 or newer"
 
@@ -256,6 +259,7 @@ find "$config/omarchy/plugins/$plugin_id" -name list.sh -exec chmod +x {} +
 rm -f "$bindir/omarchy-ambient-select" "$bindir/omarchy-ambient-background-select"
 cat >"$bindir/omarchy-ambient-select" <<SCRIPT
 #!/bin/bash
+export OMARCHY_AMBIENT_BIN="$bindir/omarchy-ambient"
 exec python3 "$selector/background_selector.py" "\$@"
 SCRIPT
 chmod +x "$bindir/omarchy-ambient-select"

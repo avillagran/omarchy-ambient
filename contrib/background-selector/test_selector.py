@@ -8,10 +8,10 @@ class Routing(unittest.TestCase):
    with self.subTest(status=status),patch.object(m,'capture',return_value=status):self.assertEqual(m.active_category(),category)
  def test_current_opens_selected_mode_without_applying_a_background(self):
   for category in ('theme','background','amiga'):
-   with patch.object(m,'active_category',return_value=category),patch.object(m,'capture',return_value=''),patch.object(m,'run') as run:
+   with patch.object(m,'active_category',return_value=category),patch.object(m,'capture',return_value=''),patch.object(m,'run') as run,patch.object(m,'succeeds',return_value=True) as ok:
     m.main(['current'])
     if category=='amiga':run.assert_called_once_with(m.AMBIENT,'start','amiga')
-    elif category=='background':run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle')
+    elif category=='background':ok.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle');run.assert_not_called()
     else:run.assert_not_called()
  def test_resolution_steps_keep_other_settings_and_leave_no_empty_file(self):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'CONFIG',Path(d)):
@@ -74,14 +74,14 @@ class Routing(unittest.TestCase):
    with patch.object(m,'run') as run:
     m.main(['--apply-ascii',item['id']]);run.assert_called_once_with(m.AMBIENT,'start',item['source'],item['choice'])
  def test_the_same_carousel_picks_the_screensaver(self):
-  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run') as run:
-   m.main(['screensaver']);run.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle');run.reset_mock()
-   m.main(['--apply-ascii','bars']);run.assert_called_once_with(m.AMBIENT,'screensaver','--set','screensaver','fx:bars');run.reset_mock()
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run') as run,patch.object(m,'succeeds',return_value=True) as ok:
+   m.main(['screensaver']);ok.assert_called_once_with('omarchy-shell','-q','avillagran.ambient-selector','toggle');run.assert_not_called()
+   m.main(['--apply-ascii','bars']);run.assert_called_once_with(m.AMBIENT,'screensaver','--set','ttfx','fx:bars');run.reset_mock()
    m.main(['--apply-ascii','neon-city']);run.assert_called_once_with(m.AMBIENT,'start','neon-city','')
    Path(d,'target').write_text('screensaver');run.reset_mock()
    m.main(['background']);m.main(['--apply-ascii','neon-city']);self.assertEqual(run.call_args.args[:3],(m.AMBIENT,'start','neon-city'))
  def test_saver_stays_as_an_alias(self):
-  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run'):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run'),patch.object(m,'succeeds',return_value=True):
    m.main(['saver']);self.assertTrue(m.for_screensaver())
  def test_unknown_picker_result_does_not_start(self):
   with patch.object(m,'run') as run:
@@ -92,4 +92,21 @@ class Routing(unittest.TestCase):
    item={'id':'one','label':'One'}
    with patch.object(m,'choices',return_value=[item]),patch.object(m.random.SystemRandom,'choice',side_effect=[category,item]),patch.object(m,'capture') as capture,patch.object(m,'apply') as apply,patch.object(m.subprocess,'run'):
     m.main(['random']);apply.assert_called_once_with(category,item);capture.assert_not_called()
+class SystemInstall(unittest.TestCase):
+ def test_a_shell_without_the_plugin_enables_it_before_opening(self):
+  with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch.object(m,'CACHE',Path(d)),patch.object(m,'run') as run,patch.object(m,'succeeds',return_value=False):
+   m.main(['background'])
+   self.assertEqual([c.args for c in run.call_args_list],[(m.AMBIENT,'selector','enable'),('omarchy-shell','-q','avillagran.ambient-selector','toggle')])
+ def test_scene_files_come_from_the_packaged_sources_when_the_user_has_no_copy(self):
+  with tempfile.TemporaryDirectory() as d:
+   system=Path(d,'share');(system/'neon-city').mkdir(parents=True);(system/'neon-city/source.conf').write_text('fps=auto\n')
+   (system/'neon-city/run').write_text('exec "$renderer" --neon-scene neon-city --fps auto\n')
+   with patch.object(m,'CONFIG',Path(d,'config')),patch.object(m,'SOURCE_DIRS',[system]):
+    self.assertEqual(m.scene_name('neon-city'),'neon-city');self.assertEqual(m.default_fps('neon-city'),m.AUTO_FPS)
+    (Path(d,'config/sources/neon-city')).mkdir(parents=True);Path(d,'config/sources/neon-city/source.conf').write_text('fps=40\n')
+    self.assertEqual(m.default_fps('neon-city'),40)
+ def test_every_catalog_source_ships_with_the_engine(self):
+  shipped=Path(__file__).resolve().parents[2]/'sources'
+  for item in m.choices('screensaver'):
+   with self.subTest(item=item['id']):self.assertTrue((shipped/item['source']/'source.conf').is_file())
 if __name__=='__main__':unittest.main()
