@@ -25,6 +25,8 @@ stub() {
 # unit provide their own response; even an absolute systemctl cannot reach it.
 stub systemctl 'printf "%s\n" "$*" >>"$HOME/systemctl.calls"; exit 1'
 stub systemd-run 'printf "%s\n" "$*" >>"$HOME/systemd-run.calls"; exit 1'
+# Nor the real omarchy CLI: it would reach the live shell. Tests that need it stub it.
+stub omarchy 'exit 1'
 
 # hyprctl answers from monitors.json and workspaces.json in the scratch dir,
 # and logs anything else it is asked to hyprctl.log.

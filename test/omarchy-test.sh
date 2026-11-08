@@ -78,14 +78,15 @@ cp "$extension" "$scratch/extension.orig"
 "$AMBIENT" install >"$scratch/out" 2>&1
 assert "the extension still parses" eval "parse \"\$extension\" >/dev/null"
 assert_eq "the user's rows stay" "$(row personal.notes label)" "Notes"
-assert_eq "Live Background goes under Style on Omarchy 4.0" "$(row style.live-background label)" "Live Background"
-assert_eq "each background source gets a row" "$(row style.live-background.demo action)" "$AMBIENT start demo"
-assert_eq "names are escaped" "$(row style.live-background.demo label)" 'Demo "Quoted"'
-assert_eq "a screensaver-only source is no background" "$(row style.live-background.saver label)" ""
-assert_eq "a background-only source is no screensaver" "$(row style.screensaver.live-wallpaper label)" ""
-assert_eq "each screensaver source gets a row" "$(row style.screensaver.live-saver action)" "$AMBIENT screensaver --set saver"
+assert_eq "Background becomes a submenu under Style on Omarchy 4.0" "$(row style.background action)" ""
+assert_eq "it keeps its label" "$(row style.background label)" "Background"
+assert_eq "Background > Screensaver opens the selector" "$(row style.background.screensaver action)" "omarchy-ambient-select background"
+assert_eq "Background > Theme opens the theme images" "$(row style.background.theme action)" "omarchy-ambient-select theme"
+assert_eq "Background > Random picks one" "$(row style.background.random action)" "omarchy-ambient-select random"
+assert_eq "no Amiga row without an Amiga source" "$(row style.background.amiga label)" ""
+assert_eq "the screensaver menu opens the selector" "$(row style.screensaver.live-scenes action)" "omarchy-ambient-select screensaver"
 assert_eq "the stock one can be chosen back" "$(row style.screensaver.live-text action)" "$AMBIENT screensaver --set text"
-assert_eq "the chosen screensaver is checked" "$(row style.screensaver.live-demo checked)" "[[ \$($AMBIENT screensaver --get) == demo ]]"
+assert_eq "the scenes are checked unless text or Amiga is chosen" "$(row style.screensaver.live-scenes checked)" "[[ ! \$($AMBIENT screensaver --get) =~ ^(text|amiga)\$ ]]"
 assert_eq "Preview runs the routed launcher" "$(row style.screensaver.live-preview action)" "$launcher force"
 assert_eq "so does System > Screensaver" "$(row system.screensaver action)" "$launcher force"
 
@@ -116,8 +117,8 @@ assert_eq "status says nothing is installed" "$("$AMBIENT" installed)" "menu=no 
 rm "$extension"
 fake_omarchy appearance
 "$AMBIENT" install >/dev/null 2>&1
-assert_eq "a missing extension is created" "$(row appearance.live-background label)" "Live Background"
-assert_eq "later releases put screensavers under Branding" "$(row appearance.branding.screensaver.live-demo label)" 'Demo "Quoted"'
+assert_eq "a missing extension is created" "$(row appearance.background.screensaver label)" "Screensaver"
+assert_eq "later releases put screensavers under Branding" "$(row appearance.branding.screensaver.live-scenes label)" "Set ASCII Scenes …"
 "$AMBIENT" remove >/dev/null 2>&1
 
 # An Omarchy that does it all itself.
@@ -142,7 +143,7 @@ omarchy plugin list --json >/dev/null; omarchy plugin enable amiga.idle
 "$AMBIENT" install >"$scratch/out" 2>&1
 assert "another idle clone is not replaced" test ! -e "$plugin"
 assert "and the user is told" grep -q "already replaced by amiga.idle" "$scratch/out"
-assert_eq "the menu rows still go in" "$(row style.live-background.demo action)" "$AMBIENT start demo"
+assert_eq "the menu rows still go in" "$(row style.background.screensaver action)" "omarchy-ambient-select background"
 
 "$AMBIENT" remove >/dev/null 2>&1
 omarchy plugin disable amiga.idle; rm -rf "$XDG_CONFIG_HOME/omarchy/plugins/amiga.idle"
@@ -178,7 +179,7 @@ assert "next to the bundled sources" test -d "$XDG_DATA_HOME/omarchy-ambient/sou
 assert "the old bundled sources and launcher are dropped" test ! -e "$XDG_DATA_HOME/omarchy-bg-live"
 "$AMBIENT" install >"$scratch/out" 2>&1
 assert "the old menu rows are gone" bash -c "! grep -q 'omarchy-bg-live' '$extension'"
-assert_eq "and the new ones are in" "$(row style.live-background label)" "Live Background"
+assert_eq "and the new ones are in" "$(row style.background label)" "Background"
 assert "the old idle clone is gone" test ! -e "$legacy_plugin"
 assert_eq "and the new one replaces Omarchy's" "$(enabled omarchy-ambient.idle)" "true"
 assert_eq "with the old one off" "$(enabled omarchy-bg-live.idle)" "false"

@@ -597,7 +597,7 @@ native_launcher() {
 # One "id": {row} line per menu row, built with jq so every string is
 # escaped properly.
 menu_rows() {
-  local style screensaver id dir name icon description
+  local style screensaver id dir
   if menu_has appearance.background; then style=appearance; else style=style; fi
   if menu_has appearance.branding.screensaver; then
     screensaver=appearance.branding.screensaver
@@ -609,25 +609,37 @@ menu_rows() {
     '{($id): ({icon: $icon, label: $label, description: $description, checked: $checked, action: $action} | with_entries(select(.value != "")))}' |
     sed 's/^{\(.*\)}$/  \1,/'; }
 
-  row "$style.live-background" "Live Background" "󰸉"
-  row "$style.live-background.none" "None" "󰅖" "" "[[ \$($self status) == none ]]" "$self stop"
+  # Background opens a submenu instead of Omarchy's image picker: the theme
+  # images, the scenes in the selector with live previews, and a random pick.
+  # A row without an action is a submenu, even over a stock row that has one.
+  # The selector installed beside this command, even when it is a link to it.
+  local select scenes='' amiga=''
+  for select in "$(cd "${0%/*}" 2>/dev/null && pwd)/omarchy-ambient-select" "${self%/*}/omarchy-ambient-select" \
+    "$(command -v omarchy-ambient-select)" omarchy-ambient-select; do
+    [[ -x $select ]] && break
+  done
   while read -r id; do
     dir=$(source_dir "$id")
-    supports "$id" "$dir" background || continue
-    name=$(setting "$id" "$dir" name "$id") icon=$(setting "$id" "$dir" icon 󰸉) description=$(setting "$id" "$dir" description)
-    row "$style.live-background.$id" "$name" "$icon" "$description" \
-      "[[ \$($self status | cut -d ' ' -f 1) == $id ]]" "$self start $id"
+    [[ $id == amiga ]] && { supports "$id" "$dir" background && amiga=yes; continue; }
+    supports "$id" "$dir" background && scenes=yes
   done < <(source_ids)
+  jq -cn --arg id "$style.background" '{($id): {icon: "", label: "Background", aliases: ["background", "wallpaper"]}}' |
+    sed 's/^{\(.*\)}$/  \1,/'
+  row "$style.background.theme" "Theme" "" "The images of the current theme" "" "$select theme"
+  [[ -z $scenes ]] || row "$style.background.screensaver" "Screensaver" "󱄄" "Live ASCII scenes, with previews" \
+    "[[ \$($select --current-category) == background ]]" "$select background"
+  [[ -z $amiga ]] || row "$style.background.amiga" "Amiga Demos" "󰊗" "" \
+    "[[ \$($select --current-category) == amiga ]]" "$select amiga"
+  row "$style.background.random" "Random" "󰒟" "A random image or scene" "" "$select random"
 
   row "$screensaver.live-text" "Text Effects" "󱄄" "The stock Omarchy screensaver" \
     "[[ \$($self screensaver --get) == text ]]" "$self screensaver --set text"
-  while read -r id; do
-    dir=$(source_dir "$id")
-    supports "$id" "$dir" screensaver || continue
-    name=$(setting "$id" "$dir" name "$id") icon=$(setting "$id" "$dir" icon 󱄄) description=$(setting "$id" "$dir" description)
-    row "$screensaver.live-$id" "$name" "$icon" "$description" \
-      "[[ \$($self screensaver --get) == $id ]]" "$self screensaver --set $id"
-  done < <(source_ids)
+  row "$screensaver.live-scenes" "Set ASCII Scenes …" "󱄄" "Pick a scene, with live previews" \
+    "[[ ! \$($self screensaver --get) =~ ^(text|amiga)\$ ]]" "$select screensaver"
+  if [[ -n $amiga ]]; then
+    row "$screensaver.live-amiga" "Amiga Demos" "󰊗" "" \
+      "[[ \$($self screensaver --get) == amiga ]]" "$self screensaver --set amiga"
+  fi
   if ! native_launcher; then
     row "$screensaver.live-preview" "Preview" "" "" "" "$LAUNCHER force"
     row "system.screensaver" "Screensaver" "󱄄" "" "" "$LAUNCHER force"
@@ -802,6 +814,22 @@ SELECTOR_PLUGIN=avillagran.ambient-selector
 SELECTOR_LINK=${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/plugins/$SELECTOR_PLUGIN
 selector_dir=$root/share/omarchy-ambient/plugin
 
+# Omarchy 4.x has the omarchy-plugin-* commands and the `omarchy plugin` CLI
+# side by side; either does, so a release without the old names still works.
+plugin_cli() { command -v omarchy >/dev/null && OMARCHY_PATH=${OMARCHY_PATH:-/usr/share/omarchy} omarchy plugin --help >/dev/null 2>&1; }
+plugins() { command -v omarchy-plugin-enable >/dev/null || plugin_cli; }
+plugin() {
+  local verb=$1
+  shift
+  if command -v "omarchy-plugin-$verb" >/dev/null; then
+    "omarchy-plugin-$verb" "$@"
+  elif plugin_cli; then
+    OMARCHY_PATH=${OMARCHY_PATH:-/usr/share/omarchy} omarchy plugin "$verb" "$@"
+  else
+    return 127
+  fi
+}
+
 selector_enable() {
   local _
   [[ -f $selector_dir/manifest.json ]] || fail "The selector is not installed with this omarchy-ambient"
@@ -813,20 +841,18 @@ selector_enable() {
     ln -sfn "$selector_dir" "$SELECTOR_LINK"
   fi
   # Without a running shell the selector enables itself the first time it opens.
-  command -v omarchy-plugin-enable >/dev/null || return 0
+  plugins || return 0
   omarchy-shell -q shell rescanPlugins >/dev/null 2>&1 || return 0
   # The shell knows the plugin once the rescan finishes, which takes a moment.
   for _ in {1..20}; do
-    omarchy-plugin-enable "$SELECTOR_PLUGIN" >/dev/null 2>&1 && return 0
+    plugin enable "$SELECTOR_PLUGIN" >/dev/null 2>&1 && return 0
     sleep 0.25
   done
-  fail "The shell did not pick up the background selector; try: omarchy-plugin-enable $SELECTOR_PLUGIN"
+  fail "The shell did not pick up the background selector; try: omarchy plugin enable $SELECTOR_PLUGIN"
 }
 
 selector_disable() {
-  if command -v omarchy-plugin-disable >/dev/null; then
-    omarchy-plugin-disable "$SELECTOR_PLUGIN" >/dev/null 2>&1
-  fi
+  plugin disable "$SELECTOR_PLUGIN" >/dev/null 2>&1
   if [[ -L $SELECTOR_LINK && $(readlink "$SELECTOR_LINK") == "$selector_dir" ]]; then
     rm -f "$SELECTOR_LINK"
   fi

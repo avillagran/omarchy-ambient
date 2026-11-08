@@ -17,6 +17,33 @@ manifest=$selector/installed-sources
 backups=$data/omarchy-ambient-backup
 
 say() { printf '%s\n' "$*"; }
+
+# Omarchy 4.x ships the omarchy-plugin-* commands and the newer `omarchy
+# plugin` CLI side by side; either does, so a release that drops the old names
+# still installs. The CLI wants OMARCHY_PATH, which a login session sets.
+export OMARCHY_PATH=${OMARCHY_PATH:-/usr/share/omarchy}
+plugin_cli() { command -v omarchy >/dev/null && omarchy plugin --help >/dev/null 2>&1; }
+plugins() { command -v omarchy-plugin-enable >/dev/null || plugin_cli; }
+plugin() {
+  local verb=$1
+  shift
+  if command -v "omarchy-plugin-$verb" >/dev/null; then
+    "omarchy-plugin-$verb" "$@"
+  elif plugin_cli; then
+    omarchy plugin "$verb" "$@"
+  else
+    return 127
+  fi
+}
+restart_shell() {
+  if command -v omarchy-restart-shell >/dev/null; then
+    omarchy-restart-shell
+  elif command -v omarchy >/dev/null; then
+    omarchy restart shell
+  else
+    return 127
+  fi
+}
 die() { printf 'omarchy-ambient: %s\n' "$*" >&2; exit 1; }
 
 # Move something that is not ours aside, once. Uninstalling puts it back as it was.
@@ -104,9 +131,7 @@ uninstall() {
       rebuild_menu=true
     fi
   fi
-  if command -v omarchy-plugin-disable >/dev/null; then
-    omarchy-plugin-disable "$plugin_id" >/dev/null 2>&1 || true
-  fi
+  plugin disable "$plugin_id" >/dev/null 2>&1 || true
   # A screensaver choice of ours would point at a scene that is about to go.
   id=$(sed -n 's/^[[:space:]]*source[[:space:]]*=[[:space:]]*\([a-z0-9-]*\).*$/\1/p' \
     "$config/omarchy/ambient/screensaver.conf" 2>/dev/null || true)
@@ -138,8 +163,8 @@ uninstall() {
   if $rebuild_menu && [[ -x $bindir/omarchy-ambient ]]; then
     "$bindir/omarchy-ambient" install >/dev/null 2>&1 || true
   fi
-  if [[ -d $config/omarchy/plugins/$plugin_id ]] && command -v omarchy-plugin-enable >/dev/null; then
-    omarchy-plugin-enable "$plugin_id" >/dev/null 2>&1 || true
+  if [[ -d $config/omarchy/plugins/$plugin_id ]] && plugins; then
+    plugin enable "$plugin_id" >/dev/null 2>&1 || true
   fi
   say "omarchy-ambient removed. Any config you edited in $config/omarchy/ambient stays."
 }
@@ -161,7 +186,7 @@ command -v hyprctl >/dev/null || die "this needs Omarchy on Hyprland"
 [[ ! -x /usr/bin/omarchy-ambient-select ]] ||
   die "this system already ships omarchy-ambient and its selector: open it with omarchy-ambient-select"
 # The selector is an Omarchy plugin, and plugins arrived in Omarchy 4.0.
-command -v omarchy-plugin-enable >/dev/null || die "this needs Omarchy 4.0 or newer"
+plugins || die "this needs Omarchy 4.0 or newer"
 
 missing=()
 for pair in curl:curl jq:jq socat:socat inotifywait:inotify-tools python3:python \
@@ -271,14 +296,14 @@ ln -s omarchy-ambient-select "$bindir/omarchy-ambient-background-select"
 
 # The shell only knows the plugin after a rescan, which takes a moment.
 enabled=false
-if command -v omarchy-plugin-enable >/dev/null; then
+if plugins; then
   omarchy-shell -q shell rescanPlugins
   for _ in {1..20}; do
-    omarchy-plugin-enable "$plugin_id" >/dev/null 2>&1 && { enabled=true; break; }
+    plugin enable "$plugin_id" >/dev/null 2>&1 && { enabled=true; break; }
     sleep 0.25
   done
 fi
-$enabled || say "Enable the plugin by hand: omarchy-plugin-enable $plugin_id"
+$enabled || say "Enable the plugin by hand: omarchy plugin enable $plugin_id"
 # A shell that already ran the selector keeps the old one until it reloads it.
 if $enabled; then
   for _ in {1..10}; do
@@ -286,9 +311,9 @@ if $enabled; then
     sleep 0.5
   done
   if [[ $(omarchy-shell "$plugin_id" version 2>/dev/null) != "$(<"$b/VERSION")" ]] &&
-    command -v omarchy-restart-shell >/dev/null; then
+    { command -v omarchy-restart-shell || command -v omarchy; } >/dev/null; then
     say "Restarting the Omarchy shell so it loads the new selector."
-    omarchy-restart-shell >/dev/null 2>&1 || say "Restart the shell by hand: omarchy-restart-shell"
+    restart_shell >/dev/null 2>&1 || say "Restart the shell by hand: omarchy restart shell"
   fi
 fi
 if $first && [[ $("$bindir/omarchy-ambient" installed 2>/dev/null) != "menu=yes idle=yes" ]]; then

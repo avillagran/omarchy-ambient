@@ -167,7 +167,7 @@ assert_eq "the menu starts installed" "$("$AMBIENT" installed)" "menu=yes idle=y
 ln -s "$AMBIENT" "$HOME/.local/bin/omarchy-ambient"
 before=$(sha256sum <"$menu")
 assert "it installs beside the menu" bash "$install_sh"
-assert "its scene gets a row" grep -q 'demo' "$menu"
+assert "Background > Screensaver opens its selector" grep -qF "\"action\":\"$HOME/.local/bin/omarchy-ambient-select background\"" "$menu"
 assert "it uninstalls beside the menu" bash "$install_sh" --uninstall
 assert_eq "the menu is as it was" "$(sha256sum <"$menu")" "$before"
 
