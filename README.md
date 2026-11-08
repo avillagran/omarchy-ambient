@@ -54,7 +54,8 @@ resolution, live behind the carousel. Plus and minus set its frame rate limit, b
 10 or by 20 with Shift, and F shows the fps. Enter keeps it, Escape restores it.
 Scenes find their own pace: they climb to what the machine affords, up to the
 display's refresh rate, and a machine with room to spare gets a finer grid from
-the next start. On battery they drop to 20 fps.
+the next start. On battery they drop to 20 fps, unless Style > Background >
+On Battery says Full or Turn Off.
 
 One engine runs them all: every scene works as a background and as a screensaver.
 Every scene is drawn from text glyphs on the GPU, reacts to what is playing, and
@@ -129,8 +130,11 @@ and:
   being plugged in and out;
 - pauses OWE while a live background runs, and resumes it afterwards;
 - freezes a monitor's program with SIGSTOP while the monitor is off or shows
-  a fullscreen window, while the session is locked, and on battery, so a
-  background nobody sees costs nothing;
+  a fullscreen window and while the session is locked, so a background
+  nobody sees costs nothing;
+- on battery, does what Style > Background > On Battery says: Full, 20 FPS
+  (the default; only the scenes slow down) or Turn Off, and sends a
+  notification when unplugging or plugging in changes what you see;
 - restarts a program that dies, and gives up on one that keeps dying;
 - ends when you set an ordinary background or a theme.
 
@@ -174,6 +178,18 @@ omarchy-ambient screensaver               # run it now; any activity ends it
 omarchy-ambient screensaver --get         # the selected one, or "text"
 omarchy-ambient screensaver --set text    # back to Omarchy's own
 ```
+
+### On battery
+
+```sh
+omarchy-ambient battery --get             # full, 20fps (the default) or off
+omarchy-ambient battery --set off         # pause backgrounds until the charger is back
+```
+
+The choice is kept in `~/.config/omarchy/ambient/battery.conf` and holds for
+every source; a running background starts again to take it. Without one, a
+source's own `on_battery` stands. The menu shows it only where there is a
+charger (`omarchy-ambient battery --available`).
 
 A screensaver covers every monitor with the keyboard to itself and the cursor
 hidden, ends on the first mouse motion, click, scroll or key, and gives way to

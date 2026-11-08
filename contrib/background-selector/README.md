@@ -63,8 +63,9 @@ does not establish that the native preview was included.
 
 ## Notes
 
-- Ambient pauses a source on battery by default. To keep one running, set
-  `on_battery=run` in `~/.config/omarchy/ambient/<id>.conf`.
+- On battery, scenes drop to 20 fps by default. Style > Background > On Battery
+  chooses Full, 20 FPS or Turn Off for all of them, and a notification with
+  Omarchy's logo says when unplugging or plugging in changes what it does.
 - The Omarchy shell caches QML types by directory. After changing the plugin, load it
   from a new directory and update `entryPoints` in `manifest.json`.
 - Closing the panel ends only its own preview process group, so the active background
@@ -114,7 +115,7 @@ both, as `auto (120 fps)` and `auto (+2)`. A resolution or limit chosen with the
 keys always wins. Interactive scenes drop to 30 fps while tiled windows cover
 them or after 8 seconds with the cursor still and no sound, and come back on the
 next movement or note. On battery every scene drops to 20 and returns to its
-limit on the charger.
+limit on the charger, unless On Battery is set to Full.
 
 The single TTFx effects run on the `ttfx` source, also in auto: each effect keeps
 its own pace, and the limit only holds it back where the machine cannot afford it.

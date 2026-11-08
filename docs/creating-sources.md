@@ -66,7 +66,7 @@ Plain `key=value` lines; `#` starts a comment.
 | `order` | `50` | Lower comes first in the menu |
 | `outputs` | `each` | `each`: one `run` per monitor, so each gets its own program. `focused`: one `run`, on the monitor that has focus when it starts. `all`: one `run` that covers every monitor by itself |
 | `pause` | `stop` | `stop`: freeze the program with SIGSTOP while it can't be seen. `none`: never freeze it |
-| `on_battery` | `pause` | `pause`: treat running on battery as unseen. `run`: keep going on battery |
+| `on_battery` | `20fps` | What to do on battery when the user has not chosen in Style > Background > On Battery, which wins: `full` or `20fps` keep going, `off` treats running on battery as unseen. `run` and `pause` are older names for `20fps` and `off`. The program gets the result as `OMARCHY_AMBIENT_ON_BATTERY`, and TTFx scenes as `TTFX_BG_ON_BATTERY`: they hold 20 fps on battery unless it is `full` |
 | `needs` | | Commands the source needs, separated by spaces. `kitty\|ghostty` means either one will do |
 | `placements` | `background` | Where it can run: `background`, `screensaver`, or both separated by a space |
 | `input` | `dismiss` | As a screensaver. `dismiss`: any activity ends it. `own`: the source takes input itself and ends the screensaver by exiting 0 |
@@ -115,7 +115,8 @@ ones.
 - **Don't take input.** A background never gets keyboard focus.
 - **Expect to be frozen.** With `pause=stop`, the whole process group gets
   SIGSTOP when the output is off or shows a fullscreen window, when the
-  session is locked, and on battery, then SIGCONT when it is seen again. Most
+  session is locked, and on battery when it is set to `off`, then SIGCONT
+  when it is seen again. Most
   programs need nothing for this. Programs that measure time should cope with
   a sudden jump.
 - **End on SIGTERM.** Anything still running three seconds later gets SIGKILL.

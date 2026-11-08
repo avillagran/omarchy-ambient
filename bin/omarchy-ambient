@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # omarchy:summary=Run a live program (screensaver, Amiga demo, game...) as the background or the screensaver
-# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | selector [enable | disable] | install | remove | installed | check <source-dir> | layer <command...>
+# omarchy:args=list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | battery [--get | --set full|20fps|off | --available] | selector [enable | disable] | install | remove | installed | check <source-dir> | layer <command...>
 # omarchy:examples=omarchy-ambient start screensaver
 
 # A live background is a program drawing behind the windows instead of a still
@@ -9,8 +9,8 @@
 # a run executable (see docs/creating-sources.md). While one runs, OWE is
 # paused, and the program is stopped with SIGSTOP whenever nothing can see it:
 # its output is off or shows a fullscreen window, the session is locked, or
-# the computer runs on battery. Setting an ordinary background, or a theme,
-# ends it.
+# the computer runs on battery and the user chose to turn it off then (see
+# battery_mode). Setting an ordinary background, or a theme, ends it.
 #
 # A source that lists screensaver in its placements can also run as the
 # screensaver: over everything, with the keyboard to itself, until the user
@@ -43,6 +43,11 @@ RUN_DIR=${XDG_RUNTIME_DIR:-/run/user/$UID}/omarchy-ambient
 # background can tell it is covered.
 SCREENSAVER_LOCK=$RUN_DIR/screensaver
 SCREENSAVER_CONF=$CONFIG_DIR/screensaver.conf
+# What every live background does on battery, from Background > On Battery.
+BATTERY_CONF=$CONFIG_DIR/battery.conf
+# A note about the background carries Omarchy's logo: a scene's poster,
+# cropped to the notification's square, shows only a scrap of it.
+OMARCHY_ICON=${OMARCHY_PATH:-/usr/share/omarchy}/icon.png
 # The first activity this soon after the screensaver starts doesn't end it.
 GRACE_MS=${OMARCHY_AMBIENT_GRACE_MS:-1000}
 
@@ -180,6 +185,89 @@ on_battery() {
   $mains
 }
 
+# A mains supply is what makes running on battery possible at all.
+has_charger() {
+  local supply
+  for supply in "$POWER_SUPPLIES"/*; do
+    [[ -r $supply/type && $(<"$supply/type") == Mains ]] && return 0
+  done
+  return 1
+}
+
+# What a live background does on battery: full runs it as on the charger,
+# 20fps keeps it going with scenes slowed to 20 fps, and off pauses it until
+# the charger is back. The choice in Background > On Battery holds for every
+# source; without one, a source's own on_battery stands, where run and pause
+# are the names 20fps and off had.
+battery_mode_named() {
+  case $1 in
+    full) echo full ;;
+    20fps | run) echo 20fps ;;
+    off | pause) echo off ;;
+    *) return 1 ;;
+  esac
+}
+
+battery_choice() {
+  battery_mode_named "$(sed -n 's/^[[:space:]]*on_battery[[:space:]]*=[[:space:]]*\([a-z0-9]*\).*$/\1/p' "$BATTERY_CONF" 2>/dev/null | tail -n 1)"
+}
+
+battery_mode() {
+  battery_choice || battery_mode_named "$(setting "$1" "$2" on_battery)" || echo 20fps
+}
+
+# A running background starts again to take the new choice: the scene reads
+# it once, when it starts.
+set_battery_mode() {
+  local mode temp id choice
+  mode=$(battery_mode_named "$1") && [[ $mode == "$1" ]] ||
+    { echo "Usage: omarchy-ambient battery --set full|20fps|off" >&2; exit 1; }
+  mkdir -p "$CONFIG_DIR"
+  temp=$(mktemp "$BATTERY_CONF.XXXXXX")
+  echo "on_battery=$mode" >"$temp"
+  mv -f "$temp" "$BATTERY_CONF"
+  if systemctl --user -q is-active "$UNIT" && read -r id choice <"$LIVE_FILE" 2>/dev/null && [[ -n $id ]]; then
+    "$self" start "$id" "$choice"
+  fi
+}
+
+# The logo file, or the icon theme's omarchy where there is no file.
+note() {
+  local icon=omarchy
+  [[ -f $OMARCHY_ICON ]] && icon=$OMARCHY_ICON
+  notify-send -a omarchy-ambient -i "$icon" -h "string:image-path:$icon" "$1" "$2" 2>/dev/null
+}
+
+# Tells the user when the charger comes or goes and that changes what the
+# background does, so a paused or slower scene never looks broken. Starting
+# on battery only says so when the background stays paused.
+power_note() {
+  local battery=false was=$power name
+  on_battery && battery=true
+  [[ $battery == "$was" ]] && return
+  power=$battery
+  [[ -n $was || $battery == true ]] || return
+  name=$(setting "$id" "$dir" name "$id")
+  case $battery_mode in
+    off)
+      if $battery; then
+        note "On battery: live background paused" "$name waits for the charger. Change it in Background › On Battery."
+      else
+        note "Plugged in: live background resumed" "$name is back."
+      fi
+      ;;
+    20fps)
+      # Only the scenes slow down; other programs run as they are.
+      [[ -n $was ]] && grep -q omarchy-ttfx-layer "$dir/run" 2>/dev/null || return
+      if $battery; then
+        note "On battery: live background at 20 fps" "$name slows down. Change it in Background › On Battery."
+      else
+        note "Plugged in: live background at full speed" "$name runs at its own pace again."
+      fi
+      ;;
+  esac
+}
+
 # The running screensaver's pid is in its lock file. Reading the file never
 # wakes a live background's watch on it, which only sees writes.
 screensaver_running() {
@@ -204,7 +292,7 @@ visible_outputs() {
   fi
 
   screensaver_running && return
-  [[ $on_battery_mode == pause ]] && on_battery && return
+  [[ $battery_mode == off ]] && on_battery && return
 
   hyprctl -j --batch "monitors; workspaces" | jq -rs '
     .[0] as $monitors | .[1] as $workspaces
@@ -338,6 +426,7 @@ evaluate() {
   done
 
   [[ $pause == stop || $placement == screensaver ]] || return
+  [[ $placement == screensaver ]] || power_note
   visible=" $(visible_outputs | tr '\n' ' ') "
   [[ $visible == *" locked "* ]] && echo "the session locked" && exit 0
 
@@ -386,15 +475,17 @@ await_dismiss_helper() {
 }
 
 supervise() {
-  id=$1 choice=$2 owe_paused=false cursor_hidden=false listener=
+  id=$1 choice=$2 owe_paused=false cursor_hidden=false listener= power=
   declare -gA program=() started=() paused=() failures=()
 
   dir=$(source_dir "$id") || exit 1
   outputs=$(setting "$id" "$dir" outputs each)
   pause=$(setting "$id" "$dir" pause stop)
-  on_battery_mode=$(setting "$id" "$dir" on_battery pause)
+  battery_mode=$(battery_mode "$id" "$dir")
   input=$(setting "$id" "$dir" input dismiss)
   export_source_env "$id" "$dir"
+  # The scenes keep their frame rate on battery only when told to.
+  export OMARCHY_AMBIENT_ON_BATTERY=$battery_mode TTFX_BG_ON_BATTERY=$battery_mode
   runtime=$(mktemp -d -t omarchy-ambient.XXXXXX)
   mkdir -p "$RUN_DIR"
 
@@ -605,8 +696,8 @@ menu_rows() {
     screensaver=style.screensaver
   fi
 
-  row() { jq -cn --arg id "$1" --arg label "$2" --arg icon "$3" --arg description "$4" --arg checked "$5" --arg action "$6" \
-    '{($id): ({icon: $icon, label: $label, description: $description, checked: $checked, action: $action} | with_entries(select(.value != "")))}' |
+  row() { jq -cn --arg id "$1" --arg label "$2" --arg icon "$3" --arg description "$4" --arg checked "$5" --arg action "$6" --arg when "$7" \
+    '{($id): ({icon: $icon, label: $label, description: $description, when: $when, checked: $checked, action: $action} | with_entries(select(.value != "")))}' |
     sed 's/^{\(.*\)}$/  \1,/'; }
 
   # Background opens a submenu instead of Omarchy's image picker: the theme
@@ -631,6 +722,14 @@ menu_rows() {
   [[ -z $amiga ]] || row "$style.background.amiga" "Amiga Demos" "󰊗" "" \
     "[[ \$($select --current-category) == amiga ]]" "$select amiga"
   row "$style.background.random" "Random" "󰒟" "A random image or scene" "" "$select random"
+  # Only where there is a charger to unplug.
+  row "$style.background.battery" "On Battery" "󰂃" "What live backgrounds do without the charger" "" "" "$self battery --available"
+  row "$style.background.battery.full" "Full" "󰁹" "Run as on the charger" \
+    "[[ \$($self battery --get) == full ]]" "$self battery --set full"
+  row "$style.background.battery.20fps" "20 FPS" "󰁾" "Scenes slow down to save power" \
+    "[[ \$($self battery --get) == 20fps ]]" "$self battery --set 20fps"
+  row "$style.background.battery.off" "Turn Off" "󰂎" "Paused until the charger is back" \
+    "[[ \$($self battery --get) == off ]]" "$self battery --set off"
 
   row "$screensaver.live-text" "Text Effects" "󱄄" "The stock Omarchy screensaver" \
     "[[ \$($self screensaver --get) == text ]]" "$self screensaver --set text"
@@ -859,7 +958,7 @@ selector_disable() {
   return 0
 }
 
-usage="Usage: omarchy-ambient list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | install | remove | installed | check <source-dir> | layer <command...>"
+usage="Usage: omarchy-ambient list [background|screensaver] | start <source> [choice] | stop | status | run <source> [choice] | screensaver [--get | --set <source> | <source> [choice]] | battery [--get | --set full|20fps|off | --available] | install | remove | installed | check <source-dir> | layer <command...>"
 
 case $1 in
   list)
@@ -898,6 +997,14 @@ case $1 in
         ;;
       -*) echo "$usage" >&2; exit 1 ;;
       *) run_screensaver "$2" "$3" ;;
+    esac
+    ;;
+  battery)
+    case $2 in
+      --get | '') battery_choice || echo 20fps ;;
+      --set) set_battery_mode "$3" ;;
+      --available) has_charger ;;
+      *) echo "Usage: omarchy-ambient battery [--get | --set full|20fps|off | --available]" >&2; exit 1 ;;
     esac
     ;;
   install)

@@ -57,12 +57,15 @@ assert "the selector command is on the path" test -x "$HOME/.local/bin/omarchy-a
 assert "a shell on this version needs no restart" test ! -e "$HOME/selector-restarts"
 assert_eq "the old name is an alias" "$(readlink "$HOME/.local/bin/omarchy-ambient-background-select")" omarchy-ambient-select
 assert_eq "it waits for the shell to know the plugin" "$(cat "$scratch/tries")" 3
-assert_eq "scenes keep running on battery" "$(cat "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf")" "on_battery=run"
+assert "no per-scene battery setting is written" test ! -e "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf"
 assert "Super+Ctrl+Space is bound" grep -q 'o.bind("SUPER + CTRL + SPACE"' "$shortcut"
 assert "to the selector" grep -q 'omarchy-ambient-background-select" current' "$shortcut"
 assert_eq "hyprland.lua loads it once" "$(grep -c 'require("hypr.ambient-background-selector")' "$hyprland_lua")" 1
 assert_eq "after the user's own lines" "$(sed -n 2p "$hyprland_lua")" 'require("hypr.bindings")'
 
+printf 'on_battery=run\n' >"$XDG_CONFIG_HOME/omarchy/ambient/demo.conf"
+assert "it installs over an earlier install" bash "$install_sh"
+assert "whose per-scene battery setting goes" test ! -e "$XDG_CONFIG_HOME/omarchy/ambient/demo.conf"
 printf 'on_battery=pause\n' >"$XDG_CONFIG_HOME/omarchy/ambient/demo.conf"
 # An update must work while a scene runs from the installed renderer.
 cp "$(command -v sleep)" "$b/selector/omarchy-ttfx-layer"

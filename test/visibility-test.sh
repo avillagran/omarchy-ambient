@@ -8,7 +8,7 @@ source "$(dirname "$0")/lib.sh"
 eval "$(sed -n '/^on_battery() {/,/^}/p; /^screensaver_running() {/,/^}/p; /^visible_outputs() {/,/^}/p' "$AMBIENT")"
 POWER_SUPPLIES=$OMARCHY_AMBIENT_POWER_SUPPLIES
 SCREENSAVER_LOCK=$XDG_RUNTIME_DIR/screensaver
-on_battery_mode=pause placement=background
+battery_mode=off placement=background
 
 visible() { visible_outputs | tr '\n' ' '; }
 
@@ -33,11 +33,13 @@ assert_eq "a locked session hides everything" "$(visible)" ""
 
 monitors "$two"
 echo 0 >"$scratch/power/AC/online"
-assert_eq "running on battery hides everything" "$(visible)" ""
+assert_eq "running on battery hides everything when it is turned off then" "$(visible)" ""
 
-on_battery_mode=run
-assert_eq "on_battery=run keeps it going on battery" "$(visible)" "eDP-1 DP-1 "
-on_battery_mode=pause
+battery_mode=20fps
+assert_eq "at 20 fps it keeps going on battery" "$(visible)" "eDP-1 DP-1 "
+battery_mode=full
+assert_eq "and at full speed too" "$(visible)" "eDP-1 DP-1 "
+battery_mode=off
 
 rm -r "$scratch/power/AC"
 assert_eq "a computer without a charger is never on battery" "$(visible)" "eDP-1 DP-1 "

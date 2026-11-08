@@ -274,9 +274,10 @@ for dir in "$b"/sources/*/; do
   cp -r "$dir" "$config/omarchy/ambient/sources/$id"
   mkdir -p "$data/omarchy-ambient/$id/bin"
   ln -sfn "$selector/omarchy-ttfx-layer" "$data/omarchy-ambient/$id/bin/omarchy-ttfx-layer"
-  # A laptop on battery pauses a source by default, which looks like a failed start.
+  # Earlier installs wrote on_battery=run for every scene, when battery
+  # paused them by default; Background > On Battery decides for all of them now.
   conf=$config/omarchy/ambient/$id.conf
-  [[ -e $conf ]] || printf 'on_battery=run\n' >"$conf"
+  if [[ $(cat "$conf" 2>/dev/null) == on_battery=run ]]; then rm -f "$conf"; fi
   printf '%s\n' "$id" >>"$manifest"
 done
 
