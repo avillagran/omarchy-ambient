@@ -58,6 +58,9 @@ class Routing(unittest.TestCase):
    self.assertEqual(m.learned('eye-reactive'),[60,0])
    self.assertEqual(m.learned('plain'),[0,0])
    self.assertEqual(m.learned('missing'),[0,0])
+   # A grid learned under the old limit of four shows as the renderer runs it.
+   (Path(d)/'layer'/'density-neon-city').write_text('4\n')
+   self.assertEqual(m.learned('neon-city'),[120,2])
  def test_the_carousel_can_ask_what_it_is_choosing_for(self):
   with tempfile.TemporaryDirectory() as d,patch.object(m,'TARGET',Path(d)/'target'),patch('builtins.print') as say:
    m.main(['--picking-for']);say.assert_called_with('background')

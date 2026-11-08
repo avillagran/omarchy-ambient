@@ -107,11 +107,14 @@ the limit goes back to auto, the default. In auto the renderer measures what a
 frame costs, in CPU and, where the kernel tells, in GPU, and climbs to the
 highest rate that stays within a quarter of one core and 30% of the GPU, never
 past the display's refresh rate. It remembers the rate per scene, so the next
-start begins there. A scene that holds the display's rate with room to spare is
-also remembered with a finer grid, which shows from its next start; the carousel
-shows both, as `auto (120 fps)` and `auto (+2)`. A resolution or limit chosen
-with the keys always wins. On battery every scene drops to 20 and returns to
-its limit on the charger.
+start begins there. A scene that holds the display's rate with plenty to spare
+is also remembered with a finer grid, at most two steps and only while it costs
+under 30% of that budget, which shows from its next start; the carousel shows
+both, as `auto (120 fps)` and `auto (+2)`. A resolution or limit chosen with the
+keys always wins. Interactive scenes drop to 30 fps while tiled windows cover
+them or after 8 seconds with the cursor still and no sound, and come back on the
+next movement or note. On battery every scene drops to 20 and returns to its
+limit on the charger.
 
 The single TTFx effects run on the `ttfx` source, also in auto: each effect keeps
 its own pace, and the limit only holds it back where the machine cannot afford it.

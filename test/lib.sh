@@ -7,6 +7,9 @@ failures=0
 scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 
+# Commands the user installed in the real home must not stand in for the
+# ones under test.
+PATH=$(tr ':' '\n' <<<"$PATH" | grep -vxF "$HOME/.local/bin" | paste -sd:)
 export HOME=$scratch/home XDG_CONFIG_HOME=$scratch/home/.config XDG_DATA_HOME=$scratch/home/.local/share
 export OMARCHY_AMBIENT_POWER_SUPPLIES=$scratch/power XDG_RUNTIME_DIR=$scratch/run
 # A scratch HOME does not isolate systemctl when the real session bus is inherited.

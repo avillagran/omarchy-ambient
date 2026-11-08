@@ -132,6 +132,9 @@ def scene_name(source):
         if f'--interactive-{kind}' in words:return f'interactive-{kind}'
     return None
 
+# The renderer uses at most two learned density steps, even from older files.
+MAX_LEARNED_DENSITY=2
+
 def learned(source):
     """The limit and grid density the renderer settled on for this scene here, 0 when unknown."""
     scene=scene_name(source)
@@ -139,6 +142,7 @@ def learned(source):
     for kind in ('fps','density'):
         try:values.append(int(float((LAYER_CACHE/f'{kind}-{scene}').read_text().strip())) if scene else 0)
         except (OSError,ValueError):values.append(0)
+    values[1]=max(0,min(values[1],MAX_LEARNED_DENSITY))
     return values
 
 def catalog_item(item_id):
