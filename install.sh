@@ -200,8 +200,10 @@ trap 'rm -rf "$work"' EXIT
 bundle=omarchy-ambient-bundle-$arch.tar.gz
 
 say "Downloading $bundle"
-curl -fsSL "$release/$bundle" -o "$work/$bundle" || die "could not download $release/$bundle"
-curl -fsSL "$release/SHA256SUMS" -o "$work/SHA256SUMS" || die "could not download the checksums"
+# GitHub's asset servers answer an occasional 502 or 504: try again before giving up.
+fetch() { curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors "$@"; }
+fetch "$release/$bundle" -o "$work/$bundle" || die "could not download $release/$bundle"
+fetch "$release/SHA256SUMS" -o "$work/SHA256SUMS" || die "could not download the checksums"
 (cd "$work" && grep -F " $bundle" SHA256SUMS | sha256sum -c --quiet -) >/dev/null 2>&1 ||
   die "$bundle does not match its checksum"
 tar -xzf "$work/$bundle" -C "$work"
