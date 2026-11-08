@@ -200,10 +200,19 @@ trap 'rm -rf "$work"' EXIT
 bundle=omarchy-ambient-bundle-$arch.tar.gz
 
 say "Downloading $bundle"
-# GitHub's asset servers answer an occasional 502 or 504: try again before giving up.
-fetch() { curl -fsSL --retry 6 --retry-delay 3 --retry-all-errors "$@"; }
-fetch "$release/$bundle" -o "$work/$bundle" || die "could not download $release/$bundle"
-fetch "$release/SHA256SUMS" -o "$work/SHA256SUMS" || die "could not download the checksums"
+fetch() { curl -fsSL --retry 3 --retry-delay 2 --retry-all-errors "$@"; }
+# GitHub's download links can answer 504 for hours while its API serves the
+# very same files, so the default release falls back to the API.
+api=https://api.github.com/repos/avillagran/omarchy-ambient/releases/latest
+get() {
+  local name=$1 dest=$2 url
+  fetch "$release/$name" -o "$dest" 2>/dev/null && return 0
+  [[ -z ${OMARCHY_AMBIENT_RELEASE:-} ]] || return 1
+  url=$(fetch "$api" | jq -r --arg name "$name" '.assets[] | select(.name == $name) | .url') || return 1
+  [[ $url == https://* ]] && fetch -H "Accept: application/octet-stream" "$url" -o "$dest"
+}
+get "$bundle" "$work/$bundle" || die "could not download $release/$bundle"
+get SHA256SUMS "$work/SHA256SUMS" || die "could not download the checksums"
 (cd "$work" && grep -F " $bundle" SHA256SUMS | sha256sum -c --quiet -) >/dev/null 2>&1 ||
   die "$bundle does not match its checksum"
 tar -xzf "$work/$bundle" -C "$work"
