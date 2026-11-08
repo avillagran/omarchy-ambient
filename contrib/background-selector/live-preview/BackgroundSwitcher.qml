@@ -149,7 +149,7 @@ Item {
     return root.liveNative
   }
   function cellAlpha(name) {
-    return (name==="matrix-reactive"||name==="eye-reactive"||name==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy"].indexOf(name)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
+    return (name==="matrix-reactive"||name==="eye-reactive"||name==="tunnel-reactive"||["neon-city","vector-highway","circuit-run","sunset-drive","live-terminal","data-globe","aquarium","jellyfish","cockpit","sand-clock","sand-clock-chladni","sand-clock-dunes","sand-clock-galaxy","sand-clock-ferrofluid","sand-clock-excavation","sand-clock-zen","sand-clock-foundry","sand-clock-swarm","sand-clock-shore","sand-clock-glass","sand-clock-dust-devil","sand-clock-spectrum","sand-clock-mandala","event-horizon","supernova","solar-system","abyss","load-canyon","neon-avenue","packet-grid","silicon"].indexOf(name)>=0)?1:0.78+Math.min(1,root.fxVolume*3)*0.22
   }
   // What the open carousel really costs: this shell and the preview daemon, as
   // a share of one core. Where /proc can be read this picks the level; paint

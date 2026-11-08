@@ -70,6 +70,53 @@ follows the cursor.
 | Aquarium | Jellyfish | Data Globe |
 | ![Sand Clock Galaxy](docs/media/sand-clock-galaxy.jpg) | ![Sand Clock Chladni](docs/media/sand-clock-chladni.jpg) | ![Sand Clock Dunes](docs/media/sand-clock-dunes.jpg) |
 | Sand Clock Galaxy | Sand Clock Chladni | Sand Clock Dunes |
+| ![Event Horizon](docs/media/event-horizon.jpg) | ![Supernova](docs/media/supernova.jpg) | ![Abyss](docs/media/abyss.jpg) |
+| Event Horizon | Supernova | Abyss |
+| ![Solar System](docs/media/solar-system.jpg) | ![Load Canyon](docs/media/load-canyon.jpg) | ![Neon Avenue](docs/media/neon-avenue.jpg) |
+| Solar System | Load Canyon | Neon Avenue |
+| ![Packet Grid](docs/media/packet-grid.jpg) | ![Silicon](docs/media/silicon.jpg) | ![Sand Clock Ferrofluid](docs/media/sand-clock-ferrofluid.jpg) |
+| Packet Grid | Silicon | Sand Clock Ferrofluid |
+| ![Sand Clock Excavation](docs/media/sand-clock-excavation.jpg) | ![Sand Clock Zen](docs/media/sand-clock-zen.jpg) | ![Sand Clock Foundry](docs/media/sand-clock-foundry.jpg) |
+| Sand Clock Excavation | Sand Clock Zen | Sand Clock Foundry |
+| ![Sand Clock Swarm](docs/media/sand-clock-swarm.jpg) | ![Sand Clock Shore](docs/media/sand-clock-shore.jpg) | ![Sand Clock Glass](docs/media/sand-clock-glass.jpg) |
+| Sand Clock Swarm | Sand Clock Shore | Sand Clock Glass |
+| ![Sand Clock Dust Devil](docs/media/sand-clock-dust-devil.jpg) | ![Sand Clock Spectrum](docs/media/sand-clock-spectrum.jpg) | ![Sand Clock Mandala](docs/media/sand-clock-mandala.jpg) |
+| Sand Clock Dust Devil | Sand Clock Spectrum | Sand Clock Mandala |
+
+The sand clocks are toys to play with. The cursor never clicks, so they read
+its motion: the time breaks into sand wherever the cursor passes and pours
+back, circling stirs a vortex, and a quick side to side shake blows the clock
+apart for a moment. They hear beats, drops and silence too. Ten are built
+around play: Ferrofluid is black magnetic fluid the cursor pulls into spikes;
+Excavation hides relics under sand for the cursor to brush off; Zen is a garden
+it rakes; Foundry fuses sand into circuit traces that beats run along; Swarm is
+nanobots that turn into a live waveform with music; Shore keeps glowing
+footprints until a wave takes them; Glass gathers dust in front of a neon city
+for the cursor to wipe; Dust Devil raises a whirlwind where the cursor rests;
+Spectrum pours sand into equalizer tubes the cursor blows apart; Mandala repeats
+every stroke round the time and sweeps it all into the new minute.
+
+Event Horizon through Silicon are solid 3D: a perspective camera,
+depth-tested triangles and ray-traced spheres, shaded with glyphs. Several draw the machine itself, read
+from `/proc`: Solar System and Load Canyon show per-core CPU load, memory and
+swap; Neon Avenue lights its windows and fills its sky lanes with CPU load;
+Packet Grid turns network traffic into pulses of light, downloads running at
+you and uploads away; Silicon raises and heats one core per CPU, fills its
+memory chips with use and sends disk and network traffic along its traces. All
+three answer the music and the cursor: it steers the flight down the avenue
+and scans the facade it points at, marks the grid's floor and draws packets
+in, and turns the board to name the core it rests on. Event Horizon swallows
+the rocks and star dust the cursor throws in, and each one it eats flares the
+photon ring.
+
+In the four journeys (Neon City, Vector Highway, Circuit Run and Sunset Drive)
+the cursor brings what it rests on into focus: in Neon City the tower under it
+wakes, with a scan line climbing its windows and its name over the roof; on the
+other roads a palm, a cactus, a sign, a prism, a ridge or a patch of moon
+ground lights up, framed, with its name or altitude over it. Every beat sends a
+ring of light out from the cursor. Load Canyon turns almost all the way round
+with the cursor, so the newest relief can be watched from afar, and Abyss keeps
+three shoals: silver fish, large golden ones and glowing lanternfish.
 
 ## How it works
 
@@ -99,10 +146,12 @@ omarchy-ambient stop
 
 ### In Omarchy's menus
 
-Omarchy releases that know about omarchy-ambient list the sources under
-**Appearance › Live Background** and **Appearance › Branding › Screensaver**
-by themselves. On the others, one command adds the same rows to your menu
-extension and routes the idle screensaver through omarchy-ambient:
+Omarchy releases that know about omarchy-ambient offer live backgrounds
+and screensavers by themselves. On the others, one command turns
+**Style › Background** into a submenu (Theme, Screensaver, Amiga Demos when
+installed, Random), where **Screensaver** opens the selector with live
+previews straight away, adds **Set ASCII Scenes …** to the screensaver menu,
+and routes the idle screensaver through omarchy-ambient:
 
 ```sh
 omarchy-ambient install     # menu rows, and the idle service routed
@@ -115,7 +164,7 @@ The rows go between two marked lines in
 file changes. The idle service is cloned into
 `~/.config/omarchy/plugins/omarchy-ambient.idle`, because Omarchy's idle
 service runs its own screensaver launcher by a path no user file can
-override. Run `install` again after adding a source, so it gets a row.
+override. The selector lists every scene by itself, so a new source needs no new row.
 
 ### As the screensaver
 

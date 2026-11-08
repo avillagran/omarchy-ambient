@@ -1,0 +1,11 @@
+#!/bin/bash
+set -eu
+for name in OUTPUT WIDTH HEIGHT SCALE NAMESPACE LAYER KEYBOARD; do
+  new=OMARCHY_AMBIENT_$name
+  export "OMARCHY_BG_LIVE_$name=${!new}"
+done
+# The installed renderer wins: a link left for this source by an older
+# install may point at a build without this scene. The link stands in only
+# where no renderer is installed.
+renderer=$(command -v omarchy-ttfx-layer) || renderer=$OMARCHY_AMBIENT_DATA/bin/omarchy-ttfx-layer
+exec "$renderer" --neon-scene sand-clock-glass --fps "${OMARCHY_AMBIENT_SETTING_FPS:-auto}" --resolution "${OMARCHY_AMBIENT_SETTING_RESOLUTION:-auto}"
